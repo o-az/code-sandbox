@@ -27,6 +27,9 @@
   "[markdown]": {
     "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
   },
+  "files.associations": {
+    "*.css": "css"
+  },
   "markdownlint.config": {
     "no-inline-html": false,
     "no-duplicate-heading": false

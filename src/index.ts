@@ -1,9 +1,5 @@
 export { Sandbox } from '@cloudflare/sandbox'
-import { getSandbox, proxyToSandbox, type Sandbox } from '@cloudflare/sandbox'
-
-interface Env {
-  Sandbox: DurableObjectNamespace<Sandbox>
-}
+import { getSandbox, proxyToSandbox } from '@cloudflare/sandbox'
 
 const sessions = new Map<string, string>()
 
@@ -47,7 +43,10 @@ export default {
   },
 } satisfies ExportedHandler<Cloudflare.Env>
 
-async function handleExec(request: Request, env: Env): Promise<Response> {
+async function handleExec(
+  request: Request,
+  env: Cloudflare.Env,
+): Promise<Response> {
   try {
     const { command, sessionId } = await request.json<{
       command: string
@@ -92,7 +91,10 @@ async function handleExec(request: Request, env: Env): Promise<Response> {
   }
 }
 
-async function handleReset(request: Request, _env: Env): Promise<Response> {
+async function handleReset(
+  request: Request,
+  _env: Cloudflare.Env,
+): Promise<Response> {
   try {
     const { sessionId } = await request.json<{ sessionId: string }>()
 

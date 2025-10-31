@@ -1,6 +1,8 @@
-/** @type {import('@xterm/xterm').Terminal} Terminal */
-const term = new window.Terminal({
-  fontSize: 16,
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+
+const term = new Terminal({
+  fontSize: 18,
   scrollback: 1000,
   convertEol: true,
   cursorBlink: true,
@@ -31,8 +33,8 @@ const term = new window.Terminal({
     brightWhite: '#f0f6fc',
   },
 })
-/** @type {import('@xterm/addon-fit').FitAddon} FitAddon */
-const fitAddon = new window.FitAddon()
+
+const fitAddon = new FitAddon()
 term.loadAddon(fitAddon)
 
 const terminalElement = document.querySelector('div#terminal')

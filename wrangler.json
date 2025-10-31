@@ -1,6 +1,6 @@
 {
   "$schema": "https://esm.sh/wrangler/config-schema.json",
-  "name": "foundry",
+  "name": "sandbox",
   "keep_vars": true,
   "workers_dev": true,
   "preview_urls": true,

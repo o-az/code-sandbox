@@ -1,0 +1,62 @@
+@import url("./Lilex.ttf");
+
+@font-face {
+  font-family: "Lilex";
+  src: url("./Lilex.ttf") format("truetype");
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Lilex", sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family:
+    "Lilex", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas,
+    "Courier New", monospace;
+  background: #0d1117;
+  display: flex;
+  flex-direction: column;
+}
+
+#terminal-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+}
+
+#terminal-container {
+  flex: 1;
+  padding: 12px;
+  background: #0d1117;
+  overflow: hidden;
+  height: 100%;
+}
+
+#terminal {
+  width: 100%;
+  height: 100%;
+}
+
+#footer > a {
+  color: #c9d1d990;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 12px;
+  margin-left: 12px;
+  &:hover {
+    color: #ffffff;
+  }
+}
