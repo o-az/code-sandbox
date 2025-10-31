@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" >
+    <link rel="preload" href="./Lilex.ttf" as="font" type="font/ttf" crossorigin >
+    <title>fndry</title>
+    <meta name="description" content="⌛ 📦" >
+    <meta name="keywords" content="foundry, web, shell" >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" >
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐚</text></svg>" >
+    <link rel="stylesheet" href="https://esm.sh/@xterm/xterm/css/xterm.css" >
+
+    <style>
+      @import url("./Lilex.ttf");
+
+      @font-face {
+        font-family: "Lilex";
+        src: url("./Lilex.ttf") format("truetype");
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Lilex", sans-serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        font-family:
+          "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+        background: #0d1117;
+        display: flex;
+        flex-direction: column;
+      }
+      #terminal-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+      }
+      #terminal-container {
+        flex: 1;
+        padding: 12px;
+        background: #0d1117;
+        overflow: hidden;
+      }
+      #terminal {
+        width: 100%;
+        height: 100%;
+      }
+      .footer-link {
+        color: #c9d1d990;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 600;
+        margin-top: 12px;
+        margin-left: 12px;
+        &:hover {
+          color: #ffffff;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="terminal-wrapper">
+      <section id="terminal-container">
+        <div id="terminal"></div>
+      </section>
+    </main>
+
+    <p id="status-text"></p>
+    <p id="loading"></p>
+
+    <footer>
+      <a
+        href="https://github.com/o-az/foundry-sandbox"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="footer-link"
+        title="View source code on GitHub">
+        github.com/o-az/foundry-sandbox
+      </a>
+    </footer>
+
+    <script type="module">
+      import { Terminal } from 'https://esm.sh/@xterm/xterm/lib/xterm.js'
+      import { FitAddon } from 'https://esm.sh/@xterm/addon-fit/lib/addon-fit.js'
+      window.Terminal = Terminal
+      window.FitAddon = FitAddon
+    </script>
+    <script type="module" src="./script.mjs"></script>
+  </body>
+</html>

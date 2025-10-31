@@ -1,0 +1,16 @@
+node_modules
+.DS_Store
+dist
+*.log
+.vercel
+.eslintcache
+
+_
+.env
+.env.*
+!.env.example
+*.tgz
+*.log
+
+logs
+.wrangler

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://esm.sh/wrangler/config-schema.json",
+  "name": "foundry",
+  "keep_vars": true,
+  "workers_dev": true,
+  "preview_urls": true,
+  "main": "./src/index.ts",
+  "compatibility_date": "2025-10-25",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "binding": "Web",
+    "directory": "./src/content",
+    "html_handling": "auto-trailing-slash"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "Sandbox",
+        "class_name": "Sandbox"
+      }
+    ]
+  },
+  "containers": [
+    {
+      "name": "sandbox",
+      "class_name": "Sandbox",
+      "image": "./Dockerfile"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Sandbox"
+      ]
+    }
+  ],
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "RATE_LIMITER",
+        "namespace_id": "1002",
+        "simple": {
+          "limit": 10,
+          "period": 60
+        },
+        "type": "ratelimit"
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "file_types": {
+    "env": [
+      ".env",
+      ".env.*"
+    ],
+    "jsonc": [
+      "biome.json"
+    ],
+    "json": [
+      "apple-app-site-association"
+    ],
+    "gitignore": [
+      ".easignore"
+    ],
+    "properties": [
+      ".sdkmanrc"
+    ]
+  },
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.idea",
+    ".DS_Store"
+  ],
+  "project_panel": {
+    "hide_gitignore": true
+  },
+  "languages": {
+    "HTML": {
+      "language_servers": [
+        "biome",
+        "emmet-language-server",
+        "!deno",
+        "!eslint",
+        "!dprint",
+        "!prettier"
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    },
+    "JSON": {
+      "language_servers": [
+        "vtsls",
+        "biome",
+        "json-language-server",
+        "!deno",
+        "!eslint",
+        "!dprint",
+        "!prettier"
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    },
+    "JSONC": {
+      "language_servers": [
+        "vtsls",
+        "biome",
+        "json-language-server",
+        "!deno",
+        "!eslint",
+        "!dprint",
+        "!prettier"
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    },
+    "TSX": {
+      "language_servers": [
+        "vtsls",
+        "biome",
+        "typescript-language-server",
+        "!deno",
+        "!eslint",
+        "!dprint",
+        "!prettier"
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    },
+    "JavaScript": {
+      "language_servers": [
+        "vtsls",
+        "biome",
+        "typescript-language-server",
+        "!deno",
+        "!eslint",
+        "!dprint"
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    },
+    "TypeScript": {
+      "language_servers": [
+        "vtsls",
+        "biome",
+        "typescript-language-server",
+        "!deno",
+        "!eslint",
+        "!dprint"
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    }
+  },
+  "terminal": {
+    "button": true,
+    "dock": "bottom",
+    "toolbar": {
+      "breadcrumbs": false
+    }
+  }
+}

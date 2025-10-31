@@ -1,0 +1,44 @@
+name: '🔧 Checks'
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ACTIONS_RUNNER_DEBUG: true
+
+jobs:
+  checks:
+    name: 'Checks'
+    timeout-minutes: 4
+    runs-on: ['ubuntu-latest']
+    steps:
+      - name: '🔑 Checkout'
+        uses: actions/checkout@v5
+
+      - name: '🐰 Setup Bun'
+        uses: oven-sh/setup-bun@main
+        with:
+          bun-version: 'latest'
+
+      - name: 'Install Dependencies'
+        run: bun install --frozen-lockfile
+
+      - name: 'Lint, Format & Typecheck'
+        run: |
+          bun x @biomejs/biome check .
+          bun tsc --project tsconfig.json --noEmit
+
+      - name: 'Build Worker & Workspaces'
+        run: |
+          bun run build
