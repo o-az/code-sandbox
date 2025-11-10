@@ -351,9 +351,11 @@ async function parseJsonResponse(response) {
 function renderExecResult(result) {
   if (result.stdout) {
     terminal.write(result.stdout)
+    if (!result.stdout.endsWith('\n')) terminal.write('\r\n')
   }
   if (result.stderr) {
     terminal.write(`\u001b[31m${result.stderr}\u001b[0m`)
+    if (!result.stderr.endsWith('\n')) terminal.write('\r\n')
   }
   if (!result.success) {
     const message = result.error || 'Command failed'
@@ -467,6 +469,11 @@ function sendInteractiveKey(key, domEvent) {
 
   if (domEvent.ctrlKey && domEvent.key.toLowerCase() === 'c') {
     sendInteractiveInput('\u0003')
+    return
+  }
+
+  if (domEvent.altKey && key) {
+    sendInteractiveInput(key)
     return
   }
 
