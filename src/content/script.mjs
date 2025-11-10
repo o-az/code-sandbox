@@ -1,4 +1,5 @@
 import { Terminal } from '@xterm/xterm'
+import { Readline } from 'xterm-readline'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -7,6 +8,7 @@ import { LigaturesAddon } from '@xterm/addon-ligatures'
 
 /**
  * @typedef {string} Command
+ * @typedef {Set<Command>} CommandSet
  */
 
 const PROMPT = '\u001b[32m$\u001b[0m '
@@ -68,6 +70,7 @@ const webLinksAddon = new WebLinksAddon((event, url) => {
   event.preventDefault()
   window.open(url, '_blank', 'noopener,noreferrer')
 })
+const readline = new Readline()
 
 const terminalElement = document.querySelector('div#terminal')
 if (!terminalElement) throw new Error('Terminal element not found')
@@ -78,6 +81,7 @@ terminal.loadAddon(fitAddon)
 terminal.loadAddon(clipboardAddon)
 terminal.loadAddon(ligaturesAddon)
 terminal.loadAddon(webLinksAddon)
+terminal.loadAddon(readline)
 terminal.attachCustomKeyEventHandler(
   event =>
     !(
@@ -96,23 +100,25 @@ const sessionId =
   `session-${Math.random().toString(36).slice(2, 9)}`
 localStorage.setItem('sessionId', sessionId)
 
-/** @type {{ input: string, history: string[], historyIndex: number, executing: boolean, cursor: number }} */
-const state = {
-  input: '',
-  history: [],
-  historyIndex: 0,
-  executing: false,
-  cursor: 0,
-}
-
-/** @type {WebSocket | undefined} */
+/**
+ * @type {WebSocket | undefined}
+ */
 let interactiveSocket
 let interactiveMode = false
 let interactiveInitQueued = ''
+/**
+ * @type {((value: any) => void) | undefined}
+ */
+let interactiveResolve
+/**
+ * @type {((arg0: Error) => void) | undefined}
+ */
+let interactiveReject
 let currentStatus = 'offline'
+let commandInProgress = false
+let awaitingInput = false
 
 echoBanner()
-showPrompt(false)
 terminal.focus()
 setStatus(navigator.onLine ? 'online' : 'offline')
 window.addEventListener('online', () => {
@@ -120,129 +126,85 @@ window.addEventListener('online', () => {
 })
 window.addEventListener('offline', () => setStatus('offline'))
 
-terminal.onKey(({ key, domEvent }) => {
-  if (interactiveMode) {
-    domEvent.preventDefault()
-    sendInteractiveKey(key, domEvent)
-    return
-  }
-
-  if (domEvent.ctrlKey && domEvent.key.toLowerCase() === 'c') {
-    domEvent.preventDefault()
-    if (state.executing) {
-      terminal.write('^C\r\n')
-      setStatus('online')
-    } else if (state.input.length) {
-      terminal.write('^C')
-    }
-    state.executing = false
-    showPrompt(true)
-    return
-  }
-
-  if (state.executing) {
-    domEvent.preventDefault()
-    return
-  }
-
-  switch (domEvent.key) {
-    case 'Enter':
-      domEvent.preventDefault()
-      handleEnter()
-      return
-    case 'Backspace':
-      domEvent.preventDefault()
-      deleteBackward()
-      return
-    case 'ArrowUp':
-      domEvent.preventDefault()
-      if (!state.history.length || state.historyIndex === 0) return
-      state.historyIndex -= 1
-      setInputLine(state.history[state.historyIndex])
-      return
-    case 'ArrowDown':
-      domEvent.preventDefault()
-      if (state.historyIndex >= state.history.length - 1) {
-        state.historyIndex = state.history.length
-        setInputLine('')
-      } else {
-        state.historyIndex += 1
-        setInputLine(state.history[state.historyIndex])
-      }
-      return
-    case 'ArrowLeft':
-      domEvent.preventDefault()
-      moveCursorLeft()
-      return
-    case 'ArrowRight':
-      domEvent.preventDefault()
-      moveCursorRight()
-      return
-    case 'Tab':
-      domEvent.preventDefault()
-      return
-    default:
-      break
-  }
-
-  if (
-    key.length === 1 &&
-    !domEvent.metaKey &&
-    !domEvent.altKey &&
-    !domEvent.ctrlKey
-  ) {
-    insertInput(key)
-  }
+readline.setCtrlCHandler(() => {
+  if (interactiveMode || commandInProgress) return
+  readline.println('^C')
+  setStatus('online')
+  startInputLoop()
 })
 
-attachPasteListener()
+terminal.onKey(event => {
+  if (!interactiveMode) return
+  event.domEvent.preventDefault()
+  sendInteractiveKey(event.key, event.domEvent)
+})
 
-function handleEnter() {
-  const rawCommand = state.input
+const interactiveTextarea = /** @type {HTMLTextAreaElement | null} */ (
+  terminal.textarea
+)
+interactiveTextarea?.addEventListener('paste', event => {
+  if (!interactiveMode) return
+  const text = event.clipboardData?.getData('text')
+  if (!text) return
+  event.preventDefault()
+  sendInteractiveInput(text)
+})
+
+startInputLoop()
+
+function startInputLoop() {
+  if (interactiveMode || awaitingInput) return
+  awaitingInput = true
+  readline
+    .read(PROMPT)
+    .then(async rawCommand => {
+      awaitingInput = false
+      await processCommand(rawCommand)
+      startInputLoop()
+    })
+    .catch(error => {
+      awaitingInput = false
+      if (interactiveMode) return
+      console.error('readline error', error)
+      setStatus('error')
+      startInputLoop()
+    })
+}
+
+/** @param {string} rawCommand */
+async function processCommand(rawCommand) {
   const trimmed = rawCommand.trim()
-  terminal.write('\r\n')
-
   if (!trimmed) {
-    showPrompt(true)
+    setStatus('online')
     return
   }
-
-  state.history.push(rawCommand)
-  state.historyIndex = state.history.length
-  state.input = ''
-  state.cursor = 0
 
   if (isLocalCommand(trimmed)) {
     executeLocalCommand(trimmed)
     return
   }
 
-  if (isInteractiveCommand(trimmed)) {
-    startInteractiveSession(rawCommand)
+  if (INTERACTIVE_COMMANDS.has(trimmed)) {
+    await startInteractiveSession(rawCommand)
     return
   }
 
-  state.executing = true
-
+  commandInProgress = true
   setStatus('online')
 
-  runCommand(rawCommand)
-    .then(() => {
-      if (!interactiveMode) setStatus('online')
-    })
-    .catch(error => {
-      const message =
-        error instanceof Error ? error.message : 'Unexpected command failure'
-      setStatus('error')
-      displayError(message)
-    })
-    .finally(() => {
-      state.executing = false
-      showPrompt(true)
-    })
+  try {
+    await runCommand(rawCommand)
+    if (!interactiveMode) setStatus('online')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    setStatus('error')
+    displayError(message)
+  } finally {
+    commandInProgress = false
+  }
 }
 
-/** @param {string} command */
+/** @param {Command} command */
 function runCommand(command) {
   const binary = command.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
   if (STREAMING_COMMANDS.has(binary)) {
@@ -258,20 +220,11 @@ function isLocalCommand(command) {
 }
 
 /** @param {Command} command */
-function isInteractiveCommand(command) {
-  const binary = command.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
-  return INTERACTIVE_COMMANDS.has(binary)
-}
-
-/** @param {Command} command */
 function executeLocalCommand(command) {
   const cmd = command.trim().toLowerCase()
   if (cmd === 'clear' || cmd === 'reset') {
     terminal.clear()
-    state.input = ''
-    state.executing = false
     setStatus('online')
-    showPrompt(false)
   }
 }
 
@@ -320,9 +273,8 @@ async function runStreamingCommand(command) {
   consumeSseBuffer(finalChunk, handleStreamEvent)
 }
 
-/**
- * @param {string} buffer
- * @param {Function} callback
+/** @param {string} buffer
+ * @param {((event: any) => void)} callback
  */
 function consumeSseBuffer(buffer, callback) {
   let working = buffer
@@ -346,7 +298,7 @@ function consumeSseBuffer(buffer, callback) {
   return working
 }
 
-/** @param {{ type: string, data: string, error: string, exitCode: number, command: string }} event */
+/** @param {any} event */
 function handleStreamEvent(event) {
   const type = typeof event.type === 'string' ? event.type : undefined
   if (!type) return
@@ -371,7 +323,6 @@ function handleStreamEvent(event) {
 
   if (type === 'complete') {
     const code = typeof event.exitCode === 'number' ? event.exitCode : 'unknown'
-    console.info(code)
     if (code !== 0) {
       terminal.writeln(`\r\n[process exited with code ${code}]`)
     }
@@ -379,30 +330,24 @@ function handleStreamEvent(event) {
   }
 
   if (type === 'start') {
-    const name = typeof event.command === 'string' ? event.command : 'command'
     setStatus('online')
   }
 }
 
-/**
- * @param {Response} response
- * @returns {Promise<{ stdout: string, stderr: string, success: boolean, error: string, exitCode: number }>}
- */
+/** @param {Response} response */
 async function parseJsonResponse(response) {
   const text = await response.text()
   if (!response.ok) {
     throw new Error(text || 'Command failed to start')
   }
   try {
-    return /** @type {{ stdout: string, stderr: string, success: boolean, error: string, exitCode: number }} */ (
-      JSON.parse(text)
-    )
+    return JSON.parse(text)
   } catch (error) {
     throw new Error('Malformed JSON response from sandbox')
   }
 }
 
-/** @param {{ stdout: string, stderr: string, success: boolean, error: string, exitCode: number }} result */
+/** @param {any} result */
 function renderExecResult(result) {
   if (result.stdout) {
     terminal.write(result.stdout)
@@ -417,10 +362,8 @@ function renderExecResult(result) {
   } else {
     setStatus('online')
   }
-  if (typeof result.exitCode === 'number') {
-    if (result.exitCode !== 0) {
-      terminal.writeln(`\r\n[process exited with code ${result.exitCode}]`)
-    }
+  if (typeof result.exitCode === 'number' && result.exitCode !== 0) {
+    terminal.writeln(`\r\n[process exited with code ${result.exitCode}]`)
   }
 }
 
@@ -431,14 +374,20 @@ function startInteractiveSession(command) {
       '\u001b[33mInteractive session already active. Type `exit` to close it.\u001b[0m',
     )
     setStatus('interactive')
-    return
+    return Promise.resolve()
   }
+
   interactiveMode = true
-  state.executing = true
+  commandInProgress = true
   interactiveInitQueued = command.endsWith('\n') ? command : `${command}\n`
   setStatus('interactive')
   terminal.writeln('\r\n\u001b[90mOpening interactive shell...\u001b[0m')
-  openInteractiveSocket()
+
+  return new Promise((resolve, reject) => {
+    interactiveResolve = resolve
+    interactiveReject = reject
+    openInteractiveSocket()
+  })
 }
 
 function openInteractiveSocket() {
@@ -469,11 +418,8 @@ function handleInteractiveMessage(event) {
   const { data } = event
   if (typeof data === 'string') {
     try {
-      const payload = /** @type {{ type: string, exitCode?: number }} */ (
-        JSON.parse(data)
-      )
-      if (payload?.type === 'pong') return
-      if (payload?.type === 'ready') return
+      const payload = /** @type {any} */ (JSON.parse(data))
+      if (payload?.type === 'pong' || payload?.type === 'ready') return
       if (payload?.type === 'process-exit') {
         const exitCode =
           typeof payload.exitCode === 'number' ? payload.exitCode : 'unknown'
@@ -492,7 +438,10 @@ function handleInteractiveMessage(event) {
   if (data instanceof ArrayBuffer) {
     const text = textDecoder.decode(new Uint8Array(data))
     if (text) terminal.write(text)
-  } else if (data instanceof Uint8Array) {
+    return
+  }
+
+  if (data instanceof Uint8Array) {
     const text = textDecoder.decode(data)
     if (text) terminal.write(text)
   }
@@ -508,16 +457,19 @@ function handleInteractiveError(event) {
   resetInteractiveState('error')
 }
 
-/** @param {string} key
+/**
+ * @param {string} key
  * @param {KeyboardEvent} domEvent
  */
 function sendInteractiveKey(key, domEvent) {
   if (!interactiveSocket || interactiveSocket.readyState !== WebSocket.OPEN)
     return
+
   if (domEvent.ctrlKey && domEvent.key.toLowerCase() === 'c') {
     sendInteractiveInput('\u0003')
     return
   }
+
   switch (domEvent.key) {
     case 'Enter':
       sendInteractiveInput('\r')
@@ -528,10 +480,23 @@ function sendInteractiveKey(key, domEvent) {
     case 'Tab':
       sendInteractiveInput('\t')
       return
+    case 'ArrowUp':
+      sendInteractiveInput('\u001b[A')
+      return
+    case 'ArrowDown':
+      sendInteractiveInput('\u001b[B')
+      return
+    case 'ArrowLeft':
+      sendInteractiveInput('\u001b[D')
+      return
+    case 'ArrowRight':
+      sendInteractiveInput('\u001b[C')
+      return
     default:
       break
   }
-  if (key.length === 1) {
+
+  if (key.length === 1 && !domEvent.metaKey) {
     sendInteractiveInput(key)
   }
 }
@@ -544,16 +509,14 @@ function sendInteractiveInput(text) {
   interactiveSocket.send(textEncoder.encode(text))
 }
 
-/** @param {{ type: string, cols: number, rows: number, shell?: string | undefined }} payload */
+/** @param {any} payload */
 function sendInteractiveJson(payload) {
   if (!interactiveSocket || interactiveSocket.readyState !== WebSocket.OPEN)
     return
   interactiveSocket.send(JSON.stringify(payload))
 }
 
-/**
- * @param {'online' | 'interactive' | 'error' | 'offline'} mode
- */
+/** @param {keyof typeof STATUS_STYLE} mode */
 function resetInteractiveState(mode) {
   if (interactiveSocket && interactiveSocket.readyState === WebSocket.OPEN) {
     interactiveSocket.close()
@@ -561,9 +524,16 @@ function resetInteractiveState(mode) {
   interactiveSocket = undefined
   interactiveMode = false
   interactiveInitQueued = ''
-  state.executing = false
+  commandInProgress = false
   setStatus(mode)
-  showPrompt(true)
+  if (mode === 'error') {
+    interactiveReject?.(new Error('Interactive session ended with error'))
+  } else {
+    interactiveResolve?.(undefined)
+  }
+  interactiveResolve = undefined
+  interactiveReject = undefined
+  startInputLoop()
 }
 
 function websocketUrl() {
@@ -576,14 +546,16 @@ function displayError(message) {
   terminal.writeln(`\u001b[31m${message}\u001b[0m`)
 }
 
-/**
- * @param {'online' | 'interactive' | 'error' | 'offline'} mode
- */
+/** @param {keyof typeof STATUS_STYLE} mode */
 function setStatus(mode) {
   if (currentStatus === mode) return
   currentStatus = mode
   if (!statusText) return
-  const style = STATUS_STYLE[mode] ?? STATUS_STYLE.online
+
+  const style =
+    /** @type {(typeof STATUS_STYLE)[keyof typeof STATUS_STYLE]} */ (
+      STATUS_STYLE[mode] ?? STATUS_STYLE.online
+    )
   statusText.textContent = style.text
   statusText.style.color = style.color
   statusText.style.fontSize = '12px'
@@ -591,26 +563,6 @@ function setStatus(mode) {
   statusText.style.bottom = '0'
   statusText.style.right = '0'
   statusText.style.margin = '0 18px 8px 0'
-}
-
-function showPrompt(withNewline = true) {
-  state.input = ''
-  state.historyIndex = state.history.length
-  state.cursor = 0
-  const prefix = withNewline ? '\r\n' : ''
-  terminal.write(prefix + PROMPT)
-}
-
-/** @param {string} value */
-function setInputLine(value) {
-  state.input = value
-  state.cursor = value.length
-  renderInputLine()
-}
-
-/** @param {string} text */
-function appendInput(text) {
-  insertInput(text)
 }
 
 function echoBanner() {
@@ -629,62 +581,3 @@ window.addEventListener('resize', () => {
     }
   }
 })
-
-function attachPasteListener() {
-  const textarea = /** @type {HTMLTextAreaElement | null} */ (terminal.textarea)
-  if (!textarea) return
-  textarea.addEventListener('paste', event => {
-    if (state.executing && !interactiveMode) return
-    const text = event.clipboardData?.getData('text')
-    if (!text) return
-    event.preventDefault()
-    if (interactiveMode) {
-      sendInteractiveInput(text)
-    } else {
-      insertInput(text)
-    }
-  })
-}
-
-function insertInput(text) {
-  if (!text) return
-  const before = state.input.slice(0, state.cursor)
-  const after = state.input.slice(state.cursor)
-  state.input = before + text + after
-  state.cursor += text.length
-  terminal.write(text + after)
-  if (after.length) {
-    terminal.write(`\u001b[${after.length}D`)
-  }
-}
-
-function deleteBackward() {
-  if (state.cursor === 0) return
-  const before = state.input.slice(0, state.cursor - 1)
-  const after = state.input.slice(state.cursor)
-  state.input = before + after
-  state.cursor -= 1
-  terminal.write('\b')
-  terminal.write(after + ' ')
-  terminal.write(`\u001b[${after.length + 1}D`)
-}
-
-function moveCursorLeft() {
-  if (state.cursor === 0) return
-  state.cursor -= 1
-  terminal.write('\u001b[D')
-}
-
-function moveCursorRight() {
-  if (state.cursor >= state.input.length) return
-  state.cursor += 1
-  terminal.write('\u001b[C')
-}
-
-function renderInputLine() {
-  const suffixLength = state.input.length - state.cursor
-  terminal.write(`\u001b[2K\r${PROMPT}${state.input}`)
-  if (suffixLength > 0) {
-    terminal.write(`\u001b[${suffixLength}D`)
-  }
-}
