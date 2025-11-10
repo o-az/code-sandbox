@@ -9,5 +9,3 @@
     sandbox.evm.workers.dev
   </a>
 </div>
-
-_`forge` your commands on the fly. `cast` from your couch. `anvil` and `chisel` whilre you're at it_

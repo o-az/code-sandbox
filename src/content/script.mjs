@@ -96,12 +96,13 @@ const sessionId =
   `session-${Math.random().toString(36).slice(2, 9)}`
 localStorage.setItem('sessionId', sessionId)
 
-/** @type {{ input: string, history: string[], historyIndex: number, executing: boolean }} */
+/** @type {{ input: string, history: string[], historyIndex: number, executing: boolean, cursor: number }} */
 const state = {
   input: '',
   history: [],
   historyIndex: 0,
   executing: false,
+  cursor: 0,
 }
 
 /** @type {WebSocket | undefined} */
@@ -151,9 +152,7 @@ terminal.onKey(({ key, domEvent }) => {
       return
     case 'Backspace':
       domEvent.preventDefault()
-      if (!state.input.length) return
-      state.input = state.input.slice(0, -1)
-      terminal.write('\b \b')
+      deleteBackward()
       return
     case 'ArrowUp':
       domEvent.preventDefault()
@@ -171,6 +170,14 @@ terminal.onKey(({ key, domEvent }) => {
         setInputLine(state.history[state.historyIndex])
       }
       return
+    case 'ArrowLeft':
+      domEvent.preventDefault()
+      moveCursorLeft()
+      return
+    case 'ArrowRight':
+      domEvent.preventDefault()
+      moveCursorRight()
+      return
     case 'Tab':
       domEvent.preventDefault()
       return
@@ -184,7 +191,7 @@ terminal.onKey(({ key, domEvent }) => {
     !domEvent.altKey &&
     !domEvent.ctrlKey
   ) {
-    appendInput(key)
+    insertInput(key)
   }
 })
 
@@ -203,6 +210,7 @@ function handleEnter() {
   state.history.push(rawCommand)
   state.historyIndex = state.history.length
   state.input = ''
+  state.cursor = 0
 
   if (isLocalCommand(trimmed)) {
     executeLocalCommand(trimmed)
@@ -588,6 +596,7 @@ function setStatus(mode) {
 function showPrompt(withNewline = true) {
   state.input = ''
   state.historyIndex = state.history.length
+  state.cursor = 0
   const prefix = withNewline ? '\r\n' : ''
   terminal.write(prefix + PROMPT)
 }
@@ -595,14 +604,13 @@ function showPrompt(withNewline = true) {
 /** @param {string} value */
 function setInputLine(value) {
   state.input = value
-  terminal.write('\u001b[2K\r' + PROMPT + state.input)
+  state.cursor = value.length
+  renderInputLine()
 }
 
 /** @param {string} text */
 function appendInput(text) {
-  if (!text) return
-  state.input += text
-  terminal.write(text)
+  insertInput(text)
 }
 
 function echoBanner() {
@@ -633,7 +641,50 @@ function attachPasteListener() {
     if (interactiveMode) {
       sendInteractiveInput(text)
     } else {
-      appendInput(text)
+      insertInput(text)
     }
   })
+}
+
+function insertInput(text) {
+  if (!text) return
+  const before = state.input.slice(0, state.cursor)
+  const after = state.input.slice(state.cursor)
+  state.input = before + text + after
+  state.cursor += text.length
+  terminal.write(text + after)
+  if (after.length) {
+    terminal.write(`\u001b[${after.length}D`)
+  }
+}
+
+function deleteBackward() {
+  if (state.cursor === 0) return
+  const before = state.input.slice(0, state.cursor - 1)
+  const after = state.input.slice(state.cursor)
+  state.input = before + after
+  state.cursor -= 1
+  terminal.write('\b')
+  terminal.write(after + ' ')
+  terminal.write(`\u001b[${after.length + 1}D`)
+}
+
+function moveCursorLeft() {
+  if (state.cursor === 0) return
+  state.cursor -= 1
+  terminal.write('\u001b[D')
+}
+
+function moveCursorRight() {
+  if (state.cursor >= state.input.length) return
+  state.cursor += 1
+  terminal.write('\u001b[C')
+}
+
+function renderInputLine() {
+  const suffixLength = state.input.length - state.cursor
+  terminal.write(`\u001b[2K\r${PROMPT}${state.input}`)
+  if (suffixLength > 0) {
+    terminal.write(`\u001b[${suffixLength}D`)
+  }
 }
