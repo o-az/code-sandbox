@@ -1,8 +1,10 @@
-import { app } from '#setup.ts'
 import { env } from 'cloudflare:workers'
+import { streamSSE } from 'hono/streaming'
 import { getSandbox } from '@cloudflare/sandbox'
 
 export { Sandbox } from '@cloudflare/sandbox'
+
+import { app } from '#setup.ts'
 
 const sessions = new Map<string, string>()
 const COMMAND_WS_PORT = Number(env.WS_PORT || 80_80)
@@ -12,6 +14,10 @@ app.get('/health', context => context.text('ok'))
 app.get('/api/ping', context => context.text('ok'))
 
 app.get('/', context => context.env.Web.fetch(context.req.raw))
+
+app.get('/.well-known', context =>
+  context.redirect('https://h0n0.evm.workers.dev/cat'),
+)
 
 app.post('/api/exec', async context => {
   const { command, sessionId } = await context.req.json<{
@@ -55,6 +61,23 @@ app.get('/api/ws', context => {
   const sandboxId = getOrCreateSandboxId(sessionId)
   const sandbox = getSandbox(context.env.Sandbox, sandboxId)
   return sandbox.wsConnect(context.req.raw, COMMAND_WS_PORT)
+})
+
+app.use('/sse/*', async (context, next) => {
+  context.header('Content-Type', 'text/event-stream')
+  context.header('Cache-Control', 'no-cache')
+  context.header('Connection', 'keep-alive')
+
+  await next()
+})
+
+app.get('/sse', async context => {
+  return streamSSE(context, async stream => {
+    while (true) {
+      await stream.writeSSE({ data: 'ping', event: 'message' })
+      await stream.sleep(500)
+    }
+  })
 })
 
 export default {

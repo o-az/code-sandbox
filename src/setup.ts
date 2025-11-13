@@ -1,6 +1,4 @@
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { csrf } from 'hono/csrf'
 import { logger } from 'hono/logger'
 import { showRoutes } from 'hono/dev'
 import { timeout } from 'hono/timeout'
@@ -13,14 +11,9 @@ import wranglerJSON from '#wrangler.json'
 
 export const app = new Hono<{ Bindings: Cloudflare.Env }>()
 
-app.use(csrf())
 app.use('*', timeout(4_000))
 app.use(prettyJSON({ space: 2 }))
 app.use('*', requestId({ headerName: `${wranglerJSON.name}-Request-Id` }))
-app.use(
-  '*',
-  cors({ origin: '*', allowMethods: ['GET', 'OPTIONS', 'POST', 'HEAD'] }),
-)
 app.use('*', async (context, next) => {
   logger()
   if (context.env.LOGGING === 'verbose') showRoutes(app, { verbose: true })

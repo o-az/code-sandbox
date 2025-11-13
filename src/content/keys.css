@@ -1,0 +1,77 @@
+.keyboard-container {
+  gap: 14px;
+  z-index: 1000;
+  padding: 10px;
+  margin: 0 auto;
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  background-color: #0c0f15;
+  transform: translateY(0);
+  opacity: 1;
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.3s ease-out;
+}
+
+.keyboard-container[data-hidden="true"] {
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(100px);
+}
+
+.key {
+  width: auto;
+  height: 24px;
+  border: none;
+  display: flex;
+  cursor: pointer;
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 400;
+  user-select: none;
+  padding: 8px 7px;
+  border-radius: 2px;
+  text-align: center;
+  align-items: center;
+  max-width: min-content;
+  /* font-family: monospace; */
+  justify-content: center;
+  -webkit-user-select: none;
+  background-color: #3a3a3c;
+  transition: all 0.15s ease;
+}
+
+.key:hover {
+  background-color: #48484a;
+}
+
+.key:active {
+  background-color: #2c2c2e;
+  transform: scale(0.95);
+}
+
+.key-pressed,
+.key[data-pressed="true"] {
+  background-color: #58a6ff;
+  color: #0d1117;
+  font-weight: 600;
+}
+
+.tab-key {
+  font-size: 20px;
+}
+
+#extra-keys-toggler {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin: 4px;
+  padding: 4px;
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

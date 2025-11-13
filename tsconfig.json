@@ -19,6 +19,8 @@
     "esModuleInterop": true,
     "allowJs": true,
     "checkJs": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,

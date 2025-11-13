@@ -2,7 +2,11 @@ import { Terminal } from '@xterm/xterm'
 import { Readline } from 'xterm-readline'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
+import { ImageAddon } from '@xterm/addon-image'
+import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { SerializeAddon } from '@xterm/addon-serialize'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { ClipboardAddon } from '@xterm/addon-clipboard'
 import { LigaturesAddon } from '@xterm/addon-ligatures'
 
@@ -30,10 +34,13 @@ const terminal = new Terminal({
   scrollback: 5000,
   convertEol: true,
   cursorBlink: true,
-  cursorStyle: 'underline',
   allowProposedApi: true,
-  cursorInactiveStyle: 'underline',
+  scrollOnUserInput: false,
+  cursorStyle: 'underline',
   rightClickSelectsWord: true,
+  rescaleOverlappingGlyphs: true,
+  ignoreBracketedPasteMode: true,
+  cursorInactiveStyle: 'underline',
   drawBoldTextInBrightColors: true,
   fontFamily:
     "'Lilex', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace",
@@ -60,8 +67,16 @@ const terminal = new Terminal({
   },
 })
 
+terminal.onBell(() => {
+  console.info('bell')
+})
+
 const fitAddon = new FitAddon()
 const webglAddon = new WebglAddon()
+const unicode11Addon = new Unicode11Addon()
+const serializeAddon = new SerializeAddon()
+const searchAddon = new SearchAddon({ highlightLimit: 50 })
+const imageAddon = new ImageAddon({ showPlaceholder: true })
 const clipboardAddon = new ClipboardAddon({
   readText: () => navigator.clipboard.readText(),
   writeText: text => navigator.clipboard.writeText(text),
@@ -77,11 +92,28 @@ const terminalElement = document.querySelector('div#terminal')
 if (!terminalElement) throw new Error('Terminal element not found')
 
 terminal.open(terminalElement)
-terminal.loadAddon(webglAddon)
+// Attach terminal instance to DOM element for context-like access
+
+// @ts-expect-error - xterm property is not typed
+terminalElement.xterm = terminal
+
+/** @returns {import('@xterm/xterm').Terminal} */
+export function getTerminal() {
+  const terminalElement = /** @type {HTMLDivElement & { xterm: Terminal }} */ (
+    document.querySelector('div#terminal')
+  )
+  return terminalElement.xterm
+}
+
 terminal.loadAddon(fitAddon)
+terminal.loadAddon(webglAddon)
+terminal.loadAddon(searchAddon)
 terminal.loadAddon(clipboardAddon)
+terminal.loadAddon(unicode11Addon)
+terminal.loadAddon(serializeAddon)
 terminal.loadAddon(ligaturesAddon)
 terminal.loadAddon(webLinksAddon)
+terminal.loadAddon(imageAddon)
 terminal.loadAddon(readline)
 terminal.attachCustomKeyEventHandler(
   event =>
@@ -135,7 +167,8 @@ setStatus(navigator.onLine ? 'online' : 'offline')
 
 // Show footer only if NOT in embed mode
 const footer = document.querySelector('footer#footer')
-if (footer && !embedMode) footer.style.display = 'block'
+if (footer && !embedMode) footer.classList.add('footer')
+else footer?.classList.remove('footer')
 
 window.addEventListener('online', () => {
   if (!interactiveMode) setStatus('online')
@@ -634,13 +667,16 @@ function setStatus(mode) {
     /** @type {(typeof STATUS_STYLE)[keyof typeof STATUS_STYLE]} */ (
       STATUS_STYLE[mode] ?? STATUS_STYLE.online
     )
+  statusText.style.top = '0'
+  statusText.style.right = '0'
+  statusText.style.top = '6px'
+  statusText.style.right = '6px'
+  statusText.style.zIndex = '1000'
+  statusText.style.fontSize = '14px'
   statusText.textContent = style.text
   statusText.style.color = style.color
-  statusText.style.fontSize = '12px'
   statusText.style.position = 'absolute'
-  statusText.style.bottom = '0'
-  statusText.style.right = '0'
-  statusText.style.margin = '0 18px 8px 0'
+  statusText.style.letterSpacing = '0.05em'
 }
 
 function echoBanner() {

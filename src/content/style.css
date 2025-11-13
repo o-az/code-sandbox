@@ -1,6 +1,7 @@
 @font-face {
   font-family: "Lilex";
   src: url("./Lilex.ttf") format("truetype");
+  font-display: swap;
 }
 
 * {
@@ -19,8 +20,8 @@ body {
 }
 
 body {
-  background: #0d1117;
   display: flex;
+  background: #0d1117;
   flex-direction: column;
 }
 
@@ -46,7 +47,14 @@ body {
   height: 100%;
 }
 
-#footer > a {
+.footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.footer > a {
   color: #c9d1d990;
   text-decoration: none;
   font-size: 12px;
@@ -66,9 +74,4 @@ body {
   color: #c9d1d990;
   font-size: 12px;
   font-weight: 400;
-}
-
-/* Hide footer by default to prevent flash */
-#footer {
-  display: none;
 }
