@@ -33,13 +33,17 @@ export class KeyboardHandler {
 
   /** @type {Set<string>} Active modifier keys (Control, Shift) */
   #activeModifiers = new Set()
+  /** @type {boolean} */
+  #synthesizing = false
 
   /**
    * @param {object} [parameters]
-   * @param {Terminal} parameters.terminal
+   * @param {Terminal} [parameters.terminal]
+   * @param {(payload: { key: string; ctrl?: boolean; shift?: boolean }) => void} [parameters.virtualInput]
    */
   constructor(parameters) {
     this.terminal = parameters?.terminal
+    this.virtualInput = parameters?.virtualInput
   }
 
   get modifiers() {
@@ -115,6 +119,14 @@ export class KeyboardHandler {
   }
 
   /**
+   * Exposes whether the handler is currently dispatching a synthetic event.
+   * @returns {boolean}
+   */
+  isSynthesizing() {
+    return this.#synthesizing
+  }
+
+  /**
    * Checks if a modifier key is currently active
    * @param {string} key
    * @returns {boolean}
@@ -128,7 +140,7 @@ export class KeyboardHandler {
    * @param {string} key
    */
   sendKeyPress(key) {
-    if (!this.terminal) return
+    const textarea = this.terminal?.textarea
 
     // For modifier keys, we need to send keyboard events
     // Find the modifier entry for this key
@@ -140,12 +152,9 @@ export class KeyboardHandler {
       const [, modifier] = modifierEntry
       // For Control and Shift, toggle the pressed state instead of sending immediately
       if (key === 'Control' || key === 'Shift') {
-        console.info('toggleModifier', key)
-        // Toggle state is handled by toggleModifier, just update UI
         return
       }
       // For other modifiers (Alt, Meta), send keyboard event
-      const textarea = this.terminal.textarea
       if (textarea) {
         const keyEvent = new KeyboardEvent('keydown', {
           key: modifier.key,
@@ -153,54 +162,86 @@ export class KeyboardHandler {
           bubbles: true,
           cancelable: true,
         })
-        textarea.dispatchEvent(keyEvent)
+        this.#dispatchSyntheticEvent(() => textarea.dispatchEvent(keyEvent))
       }
-    } else {
-      // For regular keys, apply active modifiers and then send
-      const textarea = this.terminal.textarea
-      const hasControl = this.#activeModifiers.has('Control')
-      const hasShift = this.#activeModifiers.has('Shift')
+      return
+    }
 
-      if (textarea && (hasControl || hasShift)) {
-        if (hasControl && key.length === 1 && /^[a-zA-Z]$/.test(key)) {
-          // Send exact keyboard event that readline expects for Ctrl+key
-          // This must match what happens when you physically press Ctrl+C
-          const upperKey = key.toUpperCase()
-          const keyEvent = new KeyboardEvent('keydown', {
-            key: upperKey,
-            code: `Key${upperKey}`,
-            keyCode: upperKey.charCodeAt(0),
-            which: upperKey.charCodeAt(0),
-            ctrlKey: true,
-            shiftKey: false,
-            altKey: false,
-            metaKey: false,
-            bubbles: true,
-            cancelable: true,
-          })
-          // Dispatch to textarea so readline can process it
-          textarea.dispatchEvent(keyEvent)
-          this.clearModifiers()
-        } else if (hasShift && key.length === 1) {
-          // For Shift, send uppercase via paste
-          const dataTransfer = new DataTransfer()
-          dataTransfer.setData('text/plain', key.toUpperCase())
+    // For regular keys, apply active modifiers and then send
+    const hasControl = this.#activeModifiers.has('Control')
+    const hasShift = this.#activeModifiers.has('Shift')
+
+    if (hasControl || hasShift) {
+      if (typeof this.virtualInput === 'function') {
+        this.virtualInput({ key, ctrl: hasControl, shift: hasShift })
+        this.clearModifiers()
+        return
+      }
+
+      if (
+        textarea &&
+        hasControl &&
+        key.length === 1 &&
+        /^[a-zA-Z]$/.test(key)
+      ) {
+        // Send exact keyboard event that readline expects for Ctrl+key
+        // This must match what happens when you physically press Ctrl+C
+        const upperKey = key.toUpperCase()
+        const keyEvent = new KeyboardEvent('keydown', {
+          key: upperKey,
+          code: `Key${upperKey}`,
+          keyCode: upperKey.charCodeAt(0),
+          which: upperKey.charCodeAt(0),
+          ctrlKey: true,
+          shiftKey: false,
+          altKey: false,
+          metaKey: false,
+          bubbles: true,
+          cancelable: true,
+        })
+        // Dispatch to textarea so readline can process it
+        this.#dispatchSyntheticEvent(() => textarea.dispatchEvent(keyEvent))
+        this.clearModifiers()
+        return
+      }
+
+      if (textarea && hasShift && key.length === 1) {
+        // For Shift, send uppercase via paste
+        const dataTransfer = new DataTransfer()
+        dataTransfer.setData('text/plain', key.toUpperCase())
+        this.#dispatchSyntheticEvent(() =>
           textarea.dispatchEvent(
             new ClipboardEvent('paste', {
               clipboardData: dataTransfer,
               bubbles: true,
             }),
-          )
-          this.clearModifiers()
-        } else {
-          // Fallback: just write the key
-          this.terminal.write(key)
-          this.clearModifiers()
-        }
-      } else {
-        // No active modifiers, just write the key
-        this.terminal.write(key)
+          ),
+        )
+        this.clearModifiers()
+        return
       }
+
+      // Fallback: just write the key
+      this.terminal?.write(key)
+      this.clearModifiers()
+      return
+    }
+
+    // No active modifiers, just write the key
+    this.terminal?.write(key)
+  }
+
+  /** @param {() => void} callback */
+  #dispatchSyntheticEvent(callback) {
+    if (this.#synthesizing) {
+      callback()
+      return
+    }
+    this.#synthesizing = true
+    try {
+      callback()
+    } finally {
+      this.#synthesizing = false
     }
   }
 }

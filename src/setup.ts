@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { logger } from 'hono/logger'
 import { showRoutes } from 'hono/dev'
 import { timeout } from 'hono/timeout'
 import { requestId } from 'hono/request-id'
@@ -15,7 +14,6 @@ app.use('*', timeout(4_000))
 app.use(prettyJSON({ space: 2 }))
 app.use('*', requestId({ headerName: `${wranglerJSON.name}-Request-Id` }))
 app.use('*', async (context, next) => {
-  logger()
   if (context.env.LOGGING === 'verbose') showRoutes(app, { verbose: true })
   await next()
 })

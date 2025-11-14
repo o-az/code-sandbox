@@ -64,14 +64,17 @@
 
     <script type="module">
       import { extraKeyboardKeys } from './extra-keys.mjs'
-      const footer = document.querySelector('footer#footer')
-      extraKeyboardKeys(footer)
-    </script>
-
-    <script type="module">
       import { getClientEnvironment } from './functions.mjs'
-      const clientEnvironment = getClientEnvironment()
-      console.log(clientEnvironment)
+
+      const footer = document.querySelector('footer#footer')
+      const env = getClientEnvironment()
+      const deviceType = env.device?.type?.toLowerCase()
+      const isMobileUA = deviceType === 'mobile' || deviceType === 'tablet'
+      const isSmallViewport = window.matchMedia('(max-width: 768px)').matches
+
+      extraKeyboardKeys(footer, {
+        enable: isMobileUA || isSmallViewport,
+      })
     </script>
   </body>
 </html>

@@ -1,16 +1,21 @@
-import { getTerminal } from './script.mjs'
+import { getTerminal, sendVirtualKeyboardInput } from './script.mjs'
 import { KeyboardHandler } from './keyboard.mjs'
 
-const keyboardModifiers = new KeyboardHandler({ terminal: getTerminal() })
+const keyboardModifiers = new KeyboardHandler({
+  terminal: getTerminal(),
+  virtualInput: sendVirtualKeyboardInput,
+})
 
 const domParser = new DOMParser()
 
 /**
- * @param {HTMLElement} element
+ * @param {HTMLElement | null} element
+ * @param {{ enable?: boolean }} [options]
  */
-export function extraKeyboardKeys(element) {
+export function extraKeyboardKeys(element, options) {
+  const shouldEnable = options?.enable ?? true
   const embedMode = window.location.search.includes('embed=true')
-  if (embedMode) return
+  if (!element || embedMode || !shouldEnable) return
 
   const footerElement = element.closest('footer#footer')
   if (!footerElement) throw new Error('Footer element not found')
@@ -97,8 +102,9 @@ export function extraKeyboardKeys(element) {
   const textarea = terminal?.textarea
   if (textarea) {
     textarea.addEventListener('keydown', event => {
+      if (keyboardModifiers.isSynthesizing()) return
       const activeModifiers = keyboardModifiers.getActiveModifiers()
-      if (activeModifiers.size > 0 && !event.ctrlKey && !event.shiftKey) {
+      if (activeModifiers.size > 0 && !event.ctrlKey) {
         // User typed a key while our virtual modifiers are active
         event.preventDefault()
         event.stopPropagation()

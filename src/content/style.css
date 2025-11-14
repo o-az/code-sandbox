@@ -88,3 +88,9 @@ div.slider {
   max-width: 0 !important;
   background: transparent !important;
 }
+
+@media (max-width: 768px) {
+  footer#footer > a {
+    display: none;
+  }
+}

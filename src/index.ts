@@ -1,5 +1,4 @@
 import { env } from 'cloudflare:workers'
-import { streamSSE } from 'hono/streaming'
 import { getSandbox } from '@cloudflare/sandbox'
 
 export { Sandbox } from '@cloudflare/sandbox'
@@ -64,23 +63,6 @@ app.get('/api/ws', context => {
   const sandboxId = getOrCreateSandboxId(sessionId)
   const sandbox = getSandbox(context.env.Sandbox, sandboxId)
   return sandbox.wsConnect(context.req.raw, COMMAND_WS_PORT)
-})
-
-app.use('/sse/*', async (context, next) => {
-  context.header('Content-Type', 'text/event-stream')
-  context.header('Cache-Control', 'no-cache')
-  context.header('Connection', 'keep-alive')
-
-  await next()
-})
-
-app.get('/sse', async context => {
-  return streamSSE(context, async stream => {
-    while (true) {
-      await stream.writeSSE({ data: 'ping', event: 'message' })
-      await stream.sleep(500)
-    }
-  })
 })
 
 export default {

@@ -3,8 +3,9 @@
 ## Project Structure & Module Organization
 
 - `src/index.ts` – Worker entry point; routes HTTP requests, proxies preview port exposures, and manages `/api/exec` streaming + sandbox sessions.
+- `src/pty-bridge.ts` – Bun-based WebSocket PTY bridge that powers interactive shells inside the container (spawned by `startup.sh`).
 - `src/content/` – Static assets served to the browser (terminal UI, fonts, styling, TS/JS front-end logic).
-- `scripts/` – Runtime helpers executed inside the Cloudflare sandbox container (`websocket-server.ts` hosts the PTY bridge; `startup.sh` exports `WS_PORT` and boots both the PTY and control plane).
+- `scripts/` – Runtime helpers executed inside the Cloudflare sandbox container (`startup.sh` exports `WS_PORT`, launches `src/pty-bridge.ts`, then boots the control plane).
 - `Dockerfile` – Defines the sandbox container image, installed tooling (Foundry nightly), and startup sequence.
 - `wrangler.json`, `worker-configuration.d.ts` – Cloudflare Worker configuration and typed bindings.
 

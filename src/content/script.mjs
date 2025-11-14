@@ -22,6 +22,12 @@ const API_ENDPOINT = '/api/exec'
 const WS_ENDPOINT = '/api/ws'
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
+const ALT_ARROW_SEQUENCES = {
+  ArrowUp: '\u001b[1;3A',
+  ArrowDown: '\u001b[1;3B',
+  ArrowLeft: '\u001b[1;3D',
+  ArrowRight: '\u001b[1;3C',
+}
 const STATUS_STYLE = {
   online: { text: 'Online', color: '#4ade80' },
   interactive: { text: 'Interactive', color: '#38bdf8' },
@@ -83,7 +89,7 @@ const webLinksAddon = new WebLinksAddon((event, url) => {
   event.preventDefault()
   window.open(url, '_blank', 'noopener,noreferrer')
 })
-const readline = new Readline()
+const xtermReadline = new Readline()
 webglAddon.onContextLoss(() => webglAddon.dispose())
 terminal.loadAddon(webglAddon)
 
@@ -111,16 +117,19 @@ terminal.loadAddon(serializeAddon)
 terminal.loadAddon(ligaturesAddon)
 terminal.loadAddon(webLinksAddon)
 terminal.loadAddon(imageAddon)
-terminal.loadAddon(readline)
-terminal.attachCustomKeyEventHandler(
-  event =>
-    !(
-      event.type === 'keydown' &&
-      event.key === 'c' &&
-      event.ctrlKey &&
-      event.metaKey
-    ),
-)
+terminal.loadAddon(xtermReadline)
+terminal.attachCustomKeyEventHandler(event => {
+  if (handleAltNavigation(event)) return false
+  if (
+    event.type === 'keydown' &&
+    event.key === 'c' &&
+    event.ctrlKey &&
+    event.metaKey
+  ) {
+    return false
+  }
+  return true
+})
 setTimeout(() => fitAddon.fit(), 25)
 
 const statusText = document.querySelector('p#status-text')
@@ -193,14 +202,15 @@ window.addEventListener('message', event => {
   }
 })
 
-readline.setCtrlCHandler(() => {
+xtermReadline.setCtrlCHandler(() => {
   if (interactiveMode || commandInProgress) return
-  readline.println('^C')
+  xtermReadline.println('^C')
   setStatus('online')
   startInputLoop()
 })
 
 terminal.onKey(event => {
+  if (event.domEvent.defaultPrevented) return
   if (!interactiveMode) return
   event.domEvent.preventDefault()
   sendInteractiveKey(event.key, event.domEvent)
@@ -223,7 +233,7 @@ function startInputLoop() {
   if (interactiveMode || awaitingInput) return
   awaitingInput = true
 
-  readline
+  xtermReadline
     .read(PROMPT)
     .then(async rawCommand => {
       awaitingInput = false
@@ -233,7 +243,7 @@ function startInputLoop() {
     .catch(error => {
       awaitingInput = false
       if (interactiveMode) return
-      console.error('readline error', error)
+      console.error('xtermReadline error', error)
       setStatus('error')
       startInputLoop()
     })
@@ -241,7 +251,7 @@ function startInputLoop() {
   // Pre-fill command if available and not yet used
   if (!hasPrefilledCommand && prefilledCommand) {
     hasPrefilledCommand = true
-    // Use paste to insert the pre-filled command into readline
+    // Use paste to insert the pre-filled command into xtermReadline
     setTimeout(() => {
       const dataTransfer = new DataTransfer()
       dataTransfer.setData('text/plain', prefilledCommand)
@@ -591,11 +601,6 @@ function sendInteractiveKey(key, domEvent) {
     return
   }
 
-  if (domEvent.altKey && key) {
-    sendInteractiveInput(key)
-    return
-  }
-
   switch (domEvent.key) {
     case 'Enter':
       sendInteractiveInput('\r')
@@ -708,3 +713,245 @@ window.addEventListener('resize', () => {
     }
   }
 })
+
+/**
+ * Accepts virtual keyboard events (e.g., the on-screen modifier pad) and routes
+ * them through the active input pipeline so control characters are preserved.
+ * @param {{ key: string; ctrl?: boolean; shift?: boolean }} payload
+ */
+export function sendVirtualKeyboardInput(payload) {
+  if (!payload || typeof payload.key !== 'string' || payload.key.length === 0) {
+    return
+  }
+  handleVirtualKeyboardInput({
+    key: payload.key,
+    ctrl: Boolean(payload.ctrl),
+    shift: Boolean(payload.shift),
+  })
+}
+
+/**
+ * @param {{ key: string; ctrl?: boolean; shift?: boolean }} payload
+ */
+function handleVirtualKeyboardInput(payload) {
+  if (interactiveMode) {
+    handleVirtualInteractiveInput(payload)
+    return
+  }
+  handleVirtualReadlineInput(payload)
+}
+
+/**
+ * @param {{ key: string; ctrl?: boolean; shift?: boolean }} payload
+ */
+function handleVirtualInteractiveInput(payload) {
+  const { key, ctrl, shift } = payload
+  const controlChar = ctrl ? controlCharacterForKey(key) : undefined
+  if (controlChar) {
+    sendInteractiveInput(controlChar)
+    return
+  }
+
+  if (key === 'Enter') {
+    sendInteractiveInput('\r')
+    return
+  }
+
+  if (key === 'Backspace') {
+    sendInteractiveInput('\u0008')
+    return
+  }
+
+  if (key.length === 1) {
+    const shouldUppercase = shift && /^[a-z]$/i.test(key)
+    const output = shouldUppercase ? key.toUpperCase() : key
+    sendInteractiveInput(output)
+  }
+}
+
+/**
+ * @param {{ key: string; ctrl?: boolean; shift?: boolean }} payload
+ */
+function handleVirtualReadlineInput(payload) {
+  const { key, ctrl, shift } = payload
+  const controlChar = ctrl ? controlCharacterForKey(key) : undefined
+  const internalReadline = /** @type {any} */ (xtermReadline)
+  if (controlChar) {
+    internalReadline.readData(controlChar)
+    return
+  }
+
+  if (key === 'Enter') {
+    internalReadline.readData('\r')
+    return
+  }
+
+  if (key === 'Backspace') {
+    internalReadline.readData('\u007f')
+    return
+  }
+
+  if (key.length === 1) {
+    const shouldUppercase = shift && /^[a-z]$/i.test(key)
+    const output = shouldUppercase ? key.toUpperCase() : key
+    internalReadline.readData(output)
+  }
+}
+
+/**
+ * Maps a printable key to its corresponding control character, if any.
+ * @param {string} rawKey
+ * @returns {string | undefined}
+ */
+function controlCharacterForKey(rawKey) {
+  if (!rawKey) return undefined
+  const trimmed = rawKey.trim()
+  if (!trimmed) return undefined
+
+  const match = trimmed.match(/([a-zA-Z@[\]\\^_])$/)
+  const base = match ? match[1] : trimmed[0]
+  const upper = base.toUpperCase()
+  const code = upper.codePointAt(0)
+  if (code === undefined) return undefined
+
+  if (upper >= 'A' && upper <= 'Z') {
+    return String.fromCharCode(code - 64)
+  }
+  if (upper === '@') return '\u0000'
+  if (upper === '[') return '\u001b'
+  if (upper === '\\') return '\u001c'
+  if (upper === ']') return '\u001d'
+  if (upper === '^') return '\u001e'
+  if (upper === '_') return '\u001f'
+  return undefined
+}
+
+/**
+ * Handles Alt-modified keyboard events for both interactive and xtermReadline contexts.
+ * @param {KeyboardEvent} domEvent
+ * @returns {boolean}
+ */
+function handleAltNavigation(domEvent) {
+  if (!domEvent.altKey || domEvent.type !== 'keydown') return false
+
+  if (interactiveMode) {
+    let seq
+    if (isAltArrowKey(domEvent.key)) {
+      seq = ALT_ARROW_SEQUENCES[domEvent.key]
+    }
+    domEvent.preventDefault()
+    domEvent.stopPropagation()
+    if (seq) {
+      sendInteractiveInput(seq)
+      return true
+    }
+    if (domEvent.key === 'Backspace') {
+      sendInteractiveInput('\u001b\u007f')
+      return true
+    }
+    if (domEvent.key.length === 1) {
+      sendInteractiveInput(`\u001b${domEvent.key}`)
+      return true
+    }
+    return false
+  }
+
+  domEvent.preventDefault()
+  domEvent.stopPropagation()
+
+  switch (domEvent.key) {
+    case 'ArrowLeft':
+      moveCursorByWord('left')
+      return true
+    case 'ArrowRight':
+      moveCursorByWord('right')
+      return true
+    case 'ArrowUp':
+      moveCursorToBoundary('home')
+      return true
+    case 'ArrowDown':
+      moveCursorToBoundary('end')
+      return true
+    case 'Backspace':
+      // @ts-expect-error
+      xtermReadline.readData('\u001b\u007f')
+      return true
+    default:
+      return false
+  }
+}
+
+/**
+ * Moves the xtermReadline cursor by one word in the provided direction.
+ * @param {'left' | 'right'} direction
+ */
+function moveCursorByWord(direction) {
+  const state = /** @type {any} */ (xtermReadline).state
+  if (!state?.line) return
+  const buffer = state.line.buffer()
+  const current = state.line.pos ?? buffer.length
+  if (direction === 'left') {
+    const target = findWordBoundaryLeft(buffer, current)
+    if (target === current) return
+    state.line.set_pos(target)
+    state.moveCursor()
+    return
+  }
+  if (direction === 'right') {
+    const target = findWordBoundaryRight(buffer, current)
+    if (target === current) return
+    state.line.set_pos(target)
+    state.moveCursor()
+  }
+}
+
+/**
+ * Moves the cursor to either the start or end of the line.
+ * @param {'home' | 'end'} direction
+ */
+function moveCursorToBoundary(direction) {
+  const state = /** @type {any} */ (xtermReadline).state
+  if (!state) return
+  if (direction === 'home') {
+    state.moveCursorHome()
+  } else if (direction === 'end') {
+    state.moveCursorEnd()
+  }
+}
+
+/**
+ * Finds the nearest word boundary to the left of the cursor.
+ * @param {string} buffer
+ * @param {number} index
+ */
+function findWordBoundaryLeft(buffer, index) {
+  let idx = Math.max(0, index)
+  if (idx === 0) return 0
+  idx--
+  while (idx > 0 && /\s/.test(buffer[idx])) idx--
+  while (idx > 0 && !/\s/.test(buffer[idx - 1])) idx--
+  return idx
+}
+
+/**
+ * Finds the nearest word boundary to the right of the cursor.
+ * @param {string} buffer
+ * @param {number} index
+ */
+function findWordBoundaryRight(buffer, index) {
+  const len = buffer.length
+  let idx = Math.max(0, index)
+  if (idx >= len) return len
+  while (idx < len && /\s/.test(buffer[idx])) idx++
+  while (idx < len && !/\s/.test(buffer[idx])) idx++
+  return idx
+}
+
+/**
+ * Type guard to check if a key is a supported Alt-arrow key.
+ * @param {string} key
+ * @returns {key is keyof typeof ALT_ARROW_SEQUENCES}
+ */
+function isAltArrowKey(key) {
+  return key in ALT_ARROW_SEQUENCES
+}
