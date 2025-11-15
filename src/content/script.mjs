@@ -1,5 +1,3 @@
-import { TerminalManager } from './terminal/instance.mjs'
-import { StatusIndicator } from './terminal/status.mjs'
 import {
   autoRun,
   sessionId,
@@ -9,6 +7,8 @@ import {
   INTERACTIVE_COMMANDS,
 } from './state/session.mjs'
 import { startSandboxWarmup } from './state/warmup.mjs'
+import { StatusIndicator } from './terminal/status.mjs'
+import { TerminalManager } from './terminal/instance.mjs'
 import { createCommandRunner } from './commands/runner.mjs'
 import { createVirtualKeyboardBridge } from './input/virtual.mjs'
 import { createInteractiveSession } from './interactive/session.mjs'

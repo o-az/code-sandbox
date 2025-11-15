@@ -1,5 +1,5 @@
-import { Terminal } from '@xterm/xterm'
 import { uniq } from 'es-toolkit'
+
 /**
  * @typedef {{ key: string, code: string, short: string }} Modifier
  *
@@ -38,7 +38,7 @@ export class KeyboardHandler {
 
   /**
    * @param {object} [parameters]
-   * @param {Terminal} [parameters.terminal]
+   * @param {import('@xterm/xterm').Terminal} [parameters.terminal]
    * @param {(payload: { key: string; ctrl?: boolean; shift?: boolean }) => void} [parameters.virtualInput]
    */
   constructor(parameters) {
