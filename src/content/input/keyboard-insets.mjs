@@ -1,6 +1,17 @@
 const KEYBOARD_HEIGHT_VAR = '--keyboard-height'
 
 /**
+ * @typedef {{
+ *   overlaysContent?: boolean
+ *   boundingRect?: { height: number }
+ *   addEventListener(type: 'geometrychange', listener: () => void): void
+ *   removeEventListener(type: 'geometrychange', listener: () => void): void
+ * }} VirtualKeyboard
+ *
+ * @typedef {Navigator & { virtualKeyboard?: VirtualKeyboard }} NavigatorWithKeyboard
+ */
+
+/**
  * Sets a CSS variable that reflects how much of the layout viewport is covered
  * by the on-screen keyboard. Combines VirtualKeyboard geometry (when present)
  * with VisualViewport measurements so every browser lands on the same API.
@@ -49,8 +60,8 @@ export function initKeyboardInsets() {
     handleViewportChange()
   }
 
-  /** @type {undefined | VirtualKeyboard} */
-  const virtualKeyboard = navigator.virtualKeyboard
+  const virtualKeyboard = /** @type {NavigatorWithKeyboard} */ (navigator)
+    .virtualKeyboard
   if (virtualKeyboard) {
     try {
       virtualKeyboard.overlaysContent = true
