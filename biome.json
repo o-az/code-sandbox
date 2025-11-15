@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.4/schema.json",
+  "$schema": "https://esm.sh/@biomejs/biome@2.3.5/configuration_schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -57,6 +57,7 @@
       "complexity": {
         "noBannedTypes": "off",
         "noStaticOnlyClass": "off",
+        "noImportantStyles": "off",
         "noUselessConstructor": "off"
       },
       "performance": {

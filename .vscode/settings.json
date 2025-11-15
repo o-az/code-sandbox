@@ -35,6 +35,7 @@
     "no-duplicate-heading": false
   },
   "search.exclude": {
+    ".git": true,
     "dist": true,
     "**/_/**": true,
     "bun.lock": true,

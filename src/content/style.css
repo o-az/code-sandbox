@@ -1,15 +1,24 @@
 @font-face {
   font-family: "Lilex";
-  src: url("./Lilex.ttf") format("truetype");
+  src: url("./fonts/Lilex.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Lilex";
+  src: url("./fonts/Lilex-Italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family:
-    "Lilex", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas,
-    "Courier New", monospace;
+  font-family: "Lilex", monospace;
 }
 
 html,
@@ -19,9 +28,10 @@ body {
 }
 
 body {
-  background: #0d1117;
   display: flex;
+  background: #0d1117;
   flex-direction: column;
+  font-family: "Lilex", monospace;
 }
 
 #terminal-wrapper {
@@ -35,7 +45,7 @@ body {
 
 #terminal-container {
   flex: 1;
-  padding: 12px;
+  /* padding: 12px; */
   background: #0d1117;
   overflow: hidden;
   height: 100%;
@@ -46,45 +56,41 @@ body {
   height: 100%;
 }
 
-#footer > a {
+.footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.footer > a {
   color: #c9d1d990;
   text-decoration: none;
   font-size: 12px;
   font-weight: 600;
-  margin-top: 12px;
   margin-left: 12px;
   &:hover {
     color: #ffffff;
   }
 }
 
-#terminal-touch-menu {
-  position: fixed;
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  background: rgba(13, 17, 23, 0.95);
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  z-index: 50;
-  box-shadow: 0 12px 24px rgba(140, 149, 159, 0.25);
-  backdrop-filter: blur(6px);
+#loading {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  margin: 0 12px 8px 0;
+  color: #c9d1d990;
+  font-size: 12px;
+  font-weight: 400;
 }
 
-#terminal-touch-menu > button {
-  background: #238636;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+div.slider {
+  max-width: 0 !important;
+  background: transparent !important;
 }
 
-#terminal-touch-menu > button:active,
-#terminal-touch-menu > button:focus {
-  outline: none;
-  opacity: 0.85;
+@media (max-width: 768px) {
+  footer#footer > a {
+    display: none;
+  }
 }

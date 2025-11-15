@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",
+  "imports": {
+    "#*": "./src/*",
+    "#package.json": "./package.json",
+    "#wrangler.json": "./wrangler.json"
+  },
   "scripts": {
     "dev": "echo 'Run `wrangler dev` directly, bun has a bug'",
     "deploy": "bun x wrangler@latest --config='wrangler.json' deploy --keep-vars",
@@ -11,25 +16,40 @@
     "check": "biome check . --fix --unsafe",
     "check:types": "bun tsc --project tsconfig.json --noEmit"
   },
+  "workspaces": [
+    "demo"
+  ],
   "dependencies": {
-    "@cloudflare/sandbox": "^0.4.17"
+    "@cloudflare/sandbox": "^0.4.18",
+    "hono": "^4.10.6",
+    "unstorage": "^1.17.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.4",
-    "@cloudflare/workers-types": "^4.20251109.0",
+    "@biomejs/biome": "^2.3.5",
+    "@cloudflare/workers-types": "^4.20251113.0",
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/bun": "^1.3.2",
-    "@types/node": "^24.10.0",
-    "xterm-readline": "^1.1.2",
-    "@xterm/addon-clipboard": "^0.1.0",
-    "@xterm/addon-fit": "^0.10.0",
-    "@xterm/addon-ligatures": "^0.9.0",
-    "@xterm/addon-web-links": "^0.11.0",
-    "@xterm/addon-webgl": "^0.18.0",
-    "@xterm/xterm": "^5.5.0",
+    "@types/node": "^24.10.1",
+    "@xterm/addon-clipboard": "^0.2.0-beta.121",
+    "@xterm/addon-fit": "^0.11.0-beta.138",
+    "@xterm/addon-image": "^0.9.0-beta.138",
+    "@xterm/addon-ligatures": "^0.10.0-beta.138",
+    "@xterm/addon-search": "^0.16.0-beta.138",
+    "@xterm/addon-serialize": "^0.14.0-beta.138",
+    "@xterm/addon-unicode11": "^0.9.0-beta.138",
+    "@xterm/addon-web-links": "^0.12.0-beta.138",
+    "@xterm/addon-webgl": "^0.19.0-beta.138",
+    "@xterm/xterm": "^5.6.0-beta.138",
+    "es-toolkit": "^1.41.0",
     "typed-query-selector": "^2.12.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.46.0"
+    "ua-parser-js": "^2.0.6",
+    "wrangler": "^4.48.0",
+    "vite": "npm:rolldown-vite@latest",
+    "xterm-readline": "^1.1.2"
+  },
+  "overrides": {
+    "vite": "npm:rolldown-vite@latest"
   },
   "private": true,
   "license": "MIT",
