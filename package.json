@@ -2,7 +2,6 @@
   "name": "foundry-sandbox",
   "version": "0.0.0",
   "type": "module",
-  "main": "./src/index.ts",
   "imports": {
     "#*": "./src/*",
     "#package.json": "./package.json",
@@ -12,17 +11,16 @@
     "dev": "vite dev",
     "deploy": "bun x wrangler@latest --config='wrangler.json' deploy --keep-vars",
     "build": "vite build",
-    "build:types": "bun x wrangler@latest --config='wrangler.json' types --include-runtime false",
+    "preview": "vite preview",
+    "build:types": "wrangler --config='wrangler.json' types",
     "check": "biome check . --fix --unsafe",
     "check:types": "bun tsc --project tsconfig.json --noEmit"
   },
-  "workspaces": [
-    "demo"
-  ],
   "dependencies": {
     "@cloudflare/sandbox": "^0.4.18",
-    "hono": "^4.10.6",
-    "unstorage": "^1.17.2",
+    "@tanstack/solid-router": "^1.136.5",
+    "@tanstack/solid-router-devtools": "^1.136.5",
+    "@tanstack/solid-start": "^1.136.5",
     "@xterm/addon-clipboard": "^0.2.0-beta.121",
     "@xterm/addon-fit": "^0.11.0-beta.138",
     "@xterm/addon-image": "^0.9.0-beta.138",
@@ -34,7 +32,10 @@
     "@xterm/addon-webgl": "^0.19.0-beta.138",
     "@xterm/xterm": "^5.6.0-beta.138",
     "es-toolkit": "^1.41.0",
+    "hono": "^4.10.6",
+    "solid-js": "^1.9.10",
     "ua-parser-js": "^2.0.6",
+    "unstorage": "^1.17.2",
     "xterm-readline": "^1.1.2"
   },
   "devDependencies": {
@@ -45,16 +46,13 @@
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/bun": "^1.3.2",
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
+    "tailwindcss": "^4.1.17",
     "typed-query-selector": "^2.12.0",
     "typescript": "^5.9.3",
-    "vite": "npm:rolldown-vite@latest",
+    "vite": "^7.2.2",
+    "vite-plugin-solid": "^2.11.10",
+    "vite-tsconfig-paths": "^5.1.4",
     "wrangler": "^4.48.0"
-  },
-  "overrides": {
-    "vite": "npm:rolldown-vite@latest"
   },
   "private": true,
   "license": "MIT",

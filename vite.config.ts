@@ -1,12 +1,27 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { cloudflare } from '@cloudflare/vite-plugin'
+import { default as VitePluginSolid } from 'vite-plugin-solid'
+import { default as VitePluginTailwindCSS } from '@tailwindcss/vite'
+import { default as VitePluginTSConfigPaths } from 'vite-tsconfig-paths'
+import { cloudflare as VitePluginCloudflare } from '@cloudflare/vite-plugin'
+import { tanstackStart as VitePluginTanstackStart } from '@tanstack/solid-start/plugin/vite'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cloudflare()],
   server: {
     port: 42044,
   },
-  build: {},
+  plugins: [
+    VitePluginTSConfigPaths({
+      projects: ['./tsconfig.json'],
+    }),
+    VitePluginCloudflare({
+      viteEnvironment: { name: 'ssr' },
+    }),
+    VitePluginTailwindCSS(),
+    VitePluginTanstackStart({
+      start: { entry: './src/start.ts' },
+      server: { entry: './src/server.ts' },
+      client: { entry: './src/client.ts' },
+    }),
+    VitePluginSolid({ ssr: true }),
+  ],
 })

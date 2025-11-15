@@ -2,8 +2,8 @@
 *
 
 # except for
-!./worker/**/*
-!./scripts/startup.sh
+!./src/**/*
+#!./scripts/startup.sh
 
 !./package.json
 !./wrangler.json

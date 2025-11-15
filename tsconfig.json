@@ -1,26 +1,24 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "Preserve",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "lib": [
       "ESNext",
       "DOM",
       "DOM.Iterable"
     ],
     "types": [
-      "bun",
-      "node",
+      "vite/client",
       "@cloudflare/workers-types",
       "typed-query-selector/strict"
     ],
-    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "allowJs": true,
-    "checkJs": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "react",
+    "allowSyntheticDefaultImports": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -33,9 +31,8 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "./src/**/*",
-    "./worker/**/*",
-    "./scripts/**/*"
+    "./src/**/*.ts",
+    "./src/**/*.tsx"
   ],
   "files": [
     "reset.d.ts",
@@ -43,6 +40,7 @@
     "worker-configuration.d.ts"
   ],
   "exclude": [
+    "**/_/**",
     "node_modules"
   ]
 }

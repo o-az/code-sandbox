@@ -28,20 +28,32 @@
     "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
   },
   "files.associations": {
-    "*.css": "css"
+    "*.css": "tailwindcss",
+    "biome.json": "jsonc",
+    "tsconfig.json": "jsonc",
+    "wrangler.json": "jsonc"
   },
   "markdownlint.config": {
     "no-inline-html": false,
     "no-duplicate-heading": false
+  },
+  "files.watcherExclude": {
+    "**/routeTree.gen.ts": true
+  },
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true
   },
   "search.exclude": {
     ".git": true,
     "dist": true,
     "**/_/**": true,
     "bun.lock": true,
-    "node_modules": true
+    "node_modules": true,
+    "**/.tanstack/**": true,
+    "**/routeTree.gen.ts": true
   },
   "files.exclude": {
-    ".wrangler": true
+    ".wrangler": true,
+    ".tanstack": true
   }
 }
