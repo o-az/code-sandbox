@@ -39,12 +39,12 @@ const server = Bun.serve<SessionState>({
   development: Bun.env.ENVIRONMENT !== 'production',
   fetch: (request, server) => {
     const sessionId =
-      request.headers.get('x-sandbox-session-id') ?? randomUUID().slice(0, 8)
+      request.headers.get('X-Session-ID') ?? randomUUID().slice(0, 8)
 
     if (
       server.upgrade(request, {
         headers: {
-          'x-sandbox-session-id': sessionId,
+          'X-Session-ID': sessionId,
         },
         data: {
           status: 'idle',

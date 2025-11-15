@@ -128,8 +128,7 @@ app.on(['GET', 'POST'], '/api/reset', async context => {
 })
 
 app.get('/api/ws', context => {
-  const sessionId =
-    context.req.query('sessionId') || context.req.header('x-sandbox-session-id')
+  const sessionId = context.req.header('X-Session-ID')
 
   if (!sessionId)
     return context.json({ error: 'Missing sessionId' }, { status: 400 })
@@ -154,8 +153,9 @@ export default {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers':
+            'Content-Type, Authorization, X-Session-ID, X-Tab-ID',
         },
       })
     }
