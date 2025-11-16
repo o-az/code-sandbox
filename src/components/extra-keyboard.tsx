@@ -1,14 +1,15 @@
 import {
   For,
   Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  onCleanup,
   onMount,
+  onCleanup,
+  createMemo,
+  createEffect,
+  createSignal,
 } from 'solid-js'
 import type { Terminal } from '@xterm/xterm'
 import type { JSX } from 'solid-js/h/jsx-runtime'
+import { isMobile } from '@solid-primitives/platform'
 import { useKeyDownEvent } from '@solid-primitives/keyboard'
 import { createActiveElement } from '@solid-primitives/active-element'
 import { createEventDispatcher } from '@solid-primitives/event-dispatcher'
@@ -23,6 +24,8 @@ const MODIFIER_META: Record<ModifierKey, { code: string; short: string }> = {
   Meta: { code: 'MetaLeft', short: 'meta' },
 }
 const LETTER_REGEX = /^[a-zA-Z]$/
+const KEYBOARD_OFFSET =
+  'calc(env(safe-area-inset-bottom, 0px) + max(env(keyboard-inset-height, 0px), var(--keyboard-height, 0px)) + 4px)'
 
 function isModifierKey(value: string): value is ModifierKey {
   return (MODIFIER_KEYS as readonly string[]).includes(value)
@@ -47,7 +50,6 @@ type ExtraKeyboardProps = {
   onVirtualKey?: (
     event: CustomEvent<{ key: string; modifiers: string[] }>,
   ) => void
-  onToggle?: (event: CustomEvent<{ hidden: boolean }>) => void
 }
 
 export function ExtraKeyboard(props: ExtraKeyboardProps) {
@@ -94,11 +96,7 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
 
   const handleToggleClick = () => {
     setHasInteracted(true)
-    setIsHidden(hidden => {
-      const next = !hidden
-      dispatch('toggle', { hidden: next })
-      return next
-    })
+    setIsHidden(hidden => !hidden)
   }
 
   const keyboardLabelFor = (value: ModifierKey) =>
@@ -234,7 +232,11 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
       <div
         data-hidden={isHidden() ? 'true' : 'false'}
         data-element="extra-keyboard"
-        class="keyboard-container">
+        style={{ bottom: KEYBOARD_OFFSET }}
+        class="fixed inset-x-0 z-[1000] flex justify-center gap-3.5 bg-[#0c0f15] p-2.5 transition-[opacity,transform] duration-300 ease-out"
+        classList={{
+          'pointer-events-none translate-y-full opacity-0': isHidden(),
+        }}>
         <For each={MODIFIER_KEYS}>
           {value => (
             <KeyboardButton
@@ -249,7 +251,8 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
       <button
         type="button"
         id="extra-keys-toggler"
-        class="key-toggler"
+        class="fixed right-0 z-[1001] m-1 rounded border border-white/15 bg-[#0c0f15]/90 px-2 py-1 text-xs uppercase tracking-wide text-white transition hover:text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#58a6ff]"
+        style={{ bottom: KEYBOARD_OFFSET }}
         data-element="extra-keys-toggler"
         onClick={handleToggleClick}>
         {toggleLabel()}
@@ -295,7 +298,7 @@ function createTerminalBridge() {
 
   onMount(() => {
     if (typeof window === 'undefined') return
-    if (window.location.search.includes('embed')) return
+    if (isMobile) return
     if (attach()) return
     pollHandle = window.setInterval(() => {
       if (attach() && typeof pollHandle === 'number') {
@@ -332,8 +335,10 @@ function KeyboardButton(props: KeyboardButtonProps) {
       data-key={props.value}
       data-element="extra-keyboard-key"
       data-pressed={props.pressed ? 'true' : undefined}
-      class="key"
-      classList={{ 'key-pressed': props.pressed }}>
+      class="flex h-6 items-center justify-center rounded-[2px] bg-[#3a3a3c] px-2 text-xs font-mono text-white transition duration-150 hover:bg-[#48484a] active:scale-95 active:bg-[#2c2c2e]"
+      classList={{
+        'bg-[#58a6ff] font-semibold text-[#0d1117]': props.pressed,
+      }}>
       {props.label}
     </button>
   )

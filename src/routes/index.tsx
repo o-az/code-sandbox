@@ -1,25 +1,19 @@
 import { createFileRoute } from '@tanstack/solid-router'
 import { createSignal, onCleanup, onMount } from 'solid-js'
 
+import { Status, type StatusMode } from '#components/status.tsx'
 import {
-  STATUS_STYLE,
-  type StatusMode,
-  StatusIndicator,
-} from '#lib/status-indicator.ts'
-import {
-  markRefreshIntent,
-  STREAMING_COMMANDS,
-  ensureClientSession,
   INTERACTIVE_COMMANDS,
-  consumeRefreshIntent,
-  clearStoredSessionState,
-} from '#lib/client-session.ts'
+  STREAMING_COMMANDS,
+  useSession,
+} from '#context/session.tsx'
 import { startSandboxWarmup } from '#lib/warmup.ts'
 import { TerminalManager } from '#lib/terminal-manager.ts'
 import { initKeyboardInsets } from '#lib/keyboard-insets.ts'
 import { createCommandRunner } from '#lib/command-runner.ts'
 import { ExtraKeyboard } from '#components/extra-keyboard.tsx'
 import { createInteractiveSession } from '#lib/interactive-session.ts'
+import { createVirtualKeyboardBridge } from '#lib/virtual-keyboard.ts'
 
 const PROMPT = ' \u001b[32m$\u001b[0m '
 const LOCAL_COMMANDS = new Set(['clear', 'reset'])
@@ -29,22 +23,26 @@ export const Route = createFileRoute('/')({
 })
 
 function Page() {
+  const {
+    ensureClientSession,
+    markRefreshIntent,
+    consumeRefreshIntent,
+    clearStoredSessionState,
+  } = useSession()
   const [statusMode, setStatusMode] = createSignal<StatusMode>('offline')
   const [sessionLabel, setSessionLabel] = createSignal('')
   const [statusMessage, setStatusMessage] = createSignal('Ready')
 
   let terminalRef: HTMLDivElement | undefined
-  let footerRef: HTMLElement | undefined
+  let virtualKeyboardBridge:
+    | ReturnType<typeof createVirtualKeyboardBridge>
+    | undefined
 
   onMount(() => {
     const session = ensureClientSession()
     setSessionLabel(session.sessionId)
 
     const terminalManager = new TerminalManager()
-    const statusIndicator = new StatusIndicator(undefined, {
-      onChange: mode => setStatusMode(mode),
-    })
-
     const terminalElement = terminalRef
     if (!terminalElement) throw new Error('Terminal mount missing')
 
@@ -75,35 +73,41 @@ function Page() {
     const { runCommand } = createCommandRunner({
       sessionId: session.sessionId,
       terminal,
-      setStatus: mode => statusIndicator.setStatus(mode),
+      setStatus: setStatusMode,
       displayError,
       streamingCommands: STREAMING_COMMANDS,
     })
 
-    const { startInteractiveSession, notifyResize, isInteractiveMode } =
-      createInteractiveSession({
-        terminal,
-        serializeAddon,
-        sessionId: session.sessionId,
-        setStatus: mode => statusIndicator.setStatus(mode),
-        onSessionExit: () => {
-          commandInProgress = false
-          setStatusMessage('Ready')
-          startInputLoop()
-        },
-        logLevel: session.logLevel,
-      })
+    const {
+      startInteractiveSession,
+      sendInteractiveInput,
+      notifyResize,
+      isInteractiveMode,
+    } = createInteractiveSession({
+      terminal,
+      serializeAddon,
+      sessionId: session.sessionId,
+      setStatus: setStatusMode,
+      onSessionExit: () => {
+        commandInProgress = false
+        setStatusMessage('Ready')
+        startInputLoop()
+      },
+      logLevel: session.logLevel,
+    })
+
+    virtualKeyboardBridge = createVirtualKeyboardBridge({
+      xtermReadline,
+      sendInteractiveInput,
+      isInteractiveMode,
+    })
+    altNavigationDelegate = virtualKeyboardBridge.handleAltNavigation
 
     cleanupInsets = initKeyboardInsets()
 
     terminal.writeln('\r')
     terminal.focus()
-    statusIndicator.setStatus(navigator.onLine ? 'online' : 'offline')
-
-    if (footerRef) {
-      if (!session.embedMode) footerRef.classList.add('footer')
-      else footerRef.classList.remove('footer')
-    }
+    setStatusMode(navigator.onLine ? 'online' : 'offline')
 
     const resumed = consumeRefreshIntent()
     if (resumed) {
@@ -120,9 +124,9 @@ function Page() {
     stopWarmup = stopWarmupLoop
 
     const handleOnline = () => {
-      if (!isInteractiveMode()) statusIndicator.setStatus('online')
+      if (!isInteractiveMode()) setStatusMode('online')
     }
-    const handleOffline = () => statusIndicator.setStatus('offline')
+    const handleOffline = () => setStatusMode('offline')
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
@@ -136,7 +140,6 @@ function Page() {
           which: 13,
           bubbles: true,
         })
-        console.info(terminal)
         terminal.textarea?.dispatchEvent(enterEvent)
         setTimeout(() => {
           if (session.embedMode) terminal.options.disableStdin = true
@@ -161,7 +164,7 @@ function Page() {
     readlineApi.setCtrlCHandler(() => {
       if (isInteractiveMode() || commandInProgress) return
       readlineApi.println('^C')
-      statusIndicator.setStatus('online')
+      setStatusMode('online')
       setStatusMessage('Ready')
       startInputLoop()
     })
@@ -202,7 +205,7 @@ function Page() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
-        keepalive: true,
+        // keepalive: true,
       }).catch(() => {
         // ignore errors during teardown
       })
@@ -239,7 +242,7 @@ function Page() {
           awaitingInput = false
           if (isInteractiveMode()) return
           console.error('xtermReadline error', error)
-          statusIndicator.setStatus('error')
+          setStatusMode('error')
           startInputLoop()
         })
 
@@ -276,14 +279,14 @@ function Page() {
     async function processCommand(rawCommand: string) {
       const trimmed = rawCommand.trim()
       if (!trimmed) {
-        statusIndicator.setStatus(navigator.onLine ? 'online' : 'offline')
+        setStatusMode(navigator.onLine ? 'online' : 'offline')
         setStatusMessage('Ready')
         return
       }
 
       const normalized = trimmed.toLowerCase()
       if (sessionBroken && normalized !== 'reset') {
-        statusIndicator.setStatus('error')
+        setStatusMode('error')
         displayError(
           'Sandbox shell is unavailable. Type `reset` or refresh the page to start a new session.',
         )
@@ -303,13 +306,13 @@ function Page() {
       }
 
       commandInProgress = true
-      statusIndicator.setStatus('online')
+      setStatusMode('online')
       setStatusMessage(`Running: ${trimmed}`)
 
       try {
         await runCommand(rawCommand)
         if (!isInteractiveMode()) {
-          statusIndicator.setStatus('online')
+          setStatusMode('online')
           setStatusMessage('Ready')
         }
       } catch (error) {
@@ -318,7 +321,7 @@ function Page() {
           handleFatalSandboxError(message)
           return
         }
-        statusIndicator.setStatus('error')
+        setStatusMode('error')
         setStatusMessage('Error')
         displayError(message)
       } finally {
@@ -334,7 +337,7 @@ function Page() {
       const normalized = command.trim().toLowerCase()
       if (normalized === 'clear') {
         terminal.clear()
-        statusIndicator.setStatus('online')
+        setStatusMode('online')
         setStatusMessage('Ready')
         return
       }
@@ -344,9 +347,7 @@ function Page() {
     }
 
     function displayError(message: string) {
-      terminal.writeln(`\u001b[31m${message}\u001b[0m`, () => {
-        console.info(serializeAddon.serialize())
-      })
+      terminal.writeln(`\u001b[31m${message}\u001b[0m`)
     }
 
     function isFatalSandboxError(message: string) {
@@ -361,7 +362,7 @@ function Page() {
 
     function handleFatalSandboxError(message: string) {
       sessionBroken = true
-      statusIndicator.setStatus('error')
+      setStatusMode('error')
       displayError(
         `${message}\nType \`reset\` or refresh the page to create a new sandbox session.`,
       )
@@ -370,7 +371,7 @@ function Page() {
     async function resetSandboxSession() {
       if (recoveringSession) return
       recoveringSession = true
-      statusIndicator.setStatus('error')
+      setStatusMode('error')
       setStatusMessage('Resetting...')
       terminal.writeln('\nResetting sandbox session...')
 
@@ -393,31 +394,37 @@ function Page() {
   })
 
   return (
-    <main id="terminal-wrapper">
-      <header>
-        <p
-          class="top-0 right-0 m-2 absolute text-sm"
-          style={{ color: STATUS_STYLE[statusMode()].color }}>
-          {STATUS_STYLE[statusMode()].text} · {statusMessage()}
-        </p>
+    <main
+      id="terminal-wrapper"
+      class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <header class="relative">
+        <Status mode={statusMode()} message={statusMessage()} />
       </header>
-      <div id="terminal-container">
+      <div id="terminal-container" class="flex-1 overflow-hidden bg-[#0d1117]">
         <div
           id="terminal"
           data-element="terminal"
           ref={element => {
             terminalRef = element
           }}
+          class="h-full w-full"
         />
       </div>
       <footer
         id="footer"
-        ref={element => {
-          footerRef = element
-        }}
-        class="px-4 py-3 text-xs uppercase tracking-wide text-slate-400 flex items-center justify-between gap-4">
+        class="flex items-center justify-between gap-4 px-4 py-3 text-xs uppercase tracking-wide text-slate-400">
         <span>Session {sessionLabel()}</span>
-        <ExtraKeyboard />
+        <ExtraKeyboard
+          onVirtualKey={event => {
+            const { key, modifiers } = event.detail
+            if (!key) return
+            virtualKeyboardBridge?.sendVirtualKeyboardInput({
+              key,
+              ctrl: modifiers.includes('Control'),
+              shift: modifiers.includes('Shift'),
+            })
+          }}
+        />
       </footer>
     </main>
   )

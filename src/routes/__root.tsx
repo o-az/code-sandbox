@@ -3,11 +3,17 @@
 import * as Solid from 'solid-js'
 import { HydrationScript } from 'solid-js/web'
 import { TanStackRouterDevtools } from '@tanstack/solid-router-devtools'
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/solid-router'
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRoute,
+} from '@tanstack/solid-router'
 
 import appCss from '#style.css?url'
 import xtermCss from '@xterm/xterm/css/xterm.css?url'
 import { DefaultCatchBoundary } from '#components/default-catch-boundary.tsx'
+import { SessionProvider } from '#context/session.tsx'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -30,22 +36,33 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  component: AppShell,
   shellComponent: RootDocument,
   errorComponent: DefaultCatchBoundary,
   // TODO: better 404 page
   notFoundComponent: () => <section>404</section>,
 })
 
+function AppShell() {
+  return (
+    <SessionProvider>
+      <Solid.Suspense>
+        <Outlet />
+      </Solid.Suspense>
+      <TanStackRouterDevtools position="top-right" />
+    </SessionProvider>
+  )
+}
+
 function RootDocument({ children }: { children: Solid.JSX.Element }) {
   return (
-    <html lang="en">
+    <html lang="en" class="h-full">
       <head>
         <HydrationScript />
       </head>
-      <body>
+      <body class="flex h-full min-h-screen flex-col overflow-hidden bg-[#0d1117] font-[Lilex]">
         <HeadContent />
-        <Solid.Suspense>{children}</Solid.Suspense>
-        <TanStackRouterDevtools position="top-right" />
+        {children}
         <Scripts />
       </body>
     </html>

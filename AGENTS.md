@@ -10,9 +10,7 @@
   - `routes/api/health.ts` – Keep-alive endpoint used by the client warmup loop.
   - `routes/api/reset.ts` – Destroys sandbox instances when the last tab closes.
   - `routes/api/ws.ts` – PTY WebSocket bridge that connects the browser to the container shell.
-- `src/lib/` – Shared browser-side utilities (session persistence, warmup scheduler, terminal/status managers, keyboard + virtual keyboard bridges, command runner, interactive session wiring, etc.).
 - `src/components/` – Shared Solid components (error boundaries and future UI building blocks).
-- `_old/` – Previous single-page implementation kept for reference; prefer the new `src/routes` version for changes.
 - `public/` – Static assets (fonts, robots, etc.).
 - `scripts/` – Runtime helpers executed inside the Cloudflare sandbox container (`startup.sh` exports `WS_PORT`, launches bridge services, then boots the control plane).
 - `Dockerfile` – Defines the sandbox container image, installed tooling (Foundry nightly), and startup sequence.
@@ -39,10 +37,10 @@
 
 ## Coding Style & Naming Conventions
 
-- TypeScript/JavaScript use 2-space indentation and Biome defaults (`biome.json` governs lint + format rules).
+- Almost never write abbreviations like `evt`, `ctx`, `req`, `res`; prefer full words for clarity.
 - Prefer descriptive camelCase for variables/functions (`sessionLabel`), PascalCase for exported types or classes (`Sandbox`), and kebab-case for file names except TypeScript modules.
+- Order imports by length of path and break external imports into a separate group.
 - Prefer named functions over arrow functions for handlers. Only if the function is very short and used inline, an arrow function is acceptable.
-between Worker and client code.
 - All `src/routes/api/*` handlers must validate and default their inputs with schemas from `zod/mini`; avoid bespoke parsing helpers or manual defaulting.
 - Run `bun check` before committing; unresolved lint errors block CI.
 - Keep TanStack route files colocated with their dependencies.
@@ -50,7 +48,6 @@ between Worker and client code.
 
 ## Testing Guidelines
 
-- Almost never write abbreviations like `evt`, `ctx`, `req`, `res`; prefer full words for clarity.
 - Favor early returns to reduce nesting and improve readability.
 - No automated test suite exists yet. When adding features, include minimal reproduction scripts or fixture commands (e.g., sample `chisel` session transcript).
 - For browser-side changes, run `wrangler dev`, open the preview UI, and verify:
@@ -60,12 +57,6 @@ between Worker and client code.
   - reset flows (`reset` command or `/api/reset` beacon) actually recycle the sandbox
 - Capture any relevant console logs or sandbox output when modifying runtime behavior.
 - If you add new tooling or checks, document the exact invocation commands here and ensure they run via Bun.
-
-## Commit & Pull Request Guidelines
-
-- Follow concise, imperative commit subjects (e.g., `Add PTY bridge logging`). Group related pipeline or formatting changes together.
-- Pull requests should include: summary of behavior changes, manual verification notes (`wrangler dev`, command transcripts), and links to associated issues.
-- When modifying sandbox runtime behavior, capture relevant server/browser logs in the PR description for reviewers.
 
 ## Security & Configuration Tips
 

@@ -161,10 +161,8 @@ export class TerminalManager {
     }
 
     try {
-      await (document as Document & { fonts: FontFaceSet }).fonts.ready
-      await (document as Document & { fonts: FontFaceSet }).fonts.load(
-        '17px Lilex',
-      )
+      await document.fonts.ready
+      void document.fonts.load('17px Lilex')
     } catch {
       // Ignore font load errors
     }
