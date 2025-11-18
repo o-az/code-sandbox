@@ -19,6 +19,13 @@ const ALT_ARROW_SEQUENCES: Record<string, string> = {
   ArrowRight: '\u001b[1;3C',
 }
 
+const ARROW_SEQUENCES: Record<string, string> = {
+  ArrowUp: '\u001b[A',
+  ArrowDown: '\u001b[B',
+  ArrowLeft: '\u001b[D',
+  ArrowRight: '\u001b[C',
+}
+
 const READLINE_ALT_SEQUENCES: Record<string, string> = {
   ArrowUp: '\u0001',
   ArrowDown: '\u0005',
@@ -61,6 +68,16 @@ export function createVirtualKeyboardBridge({
       return
     }
 
+    if (key === 'Escape') {
+      sendInteractiveInput('\u001b')
+      return
+    }
+
+    if (key in ARROW_SEQUENCES) {
+      sendInteractiveInput(ARROW_SEQUENCES[key])
+      return
+    }
+
     if (key === 'Enter') {
       sendInteractiveInput('\r')
       return
@@ -86,6 +103,16 @@ export function createVirtualKeyboardBridge({
     }
     if (controlChar) {
       internalReadline.readData(controlChar)
+      return
+    }
+
+    if (key === 'Escape') {
+      internalReadline.readData('\u001b')
+      return
+    }
+
+    if (key in ARROW_SEQUENCES) {
+      internalReadline.readData(ARROW_SEQUENCES[key])
       return
     }
 

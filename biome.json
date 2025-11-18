@@ -1,5 +1,5 @@
 {
-  "$schema": "https://esm.sh/@biomejs/biome@2.3.5/configuration_schema.json",
+  "$schema": "https://esm.sh/@biomejs/biome@2.3.6/configuration_schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",

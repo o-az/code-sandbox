@@ -16,6 +16,14 @@ import { Status, type StatusMode } from '#components/status.tsx'
 import { createInteractiveSession } from '#lib/interactive-session.ts'
 import { createVirtualKeyboardBridge } from '#lib/virtual-keyboard.ts'
 
+const hot = import.meta.hot
+const hotData = hot?.data as { hmrReloaded?: boolean } | undefined
+const isHotReload = Boolean(hotData?.hmrReloaded)
+if (hotData) hotData.hmrReloaded = false
+hot?.dispose(data => {
+  data.hmrReloaded = true
+})
+
 const PROMPT = ' \u001b[32m$\u001b[0m '
 const LOCAL_COMMANDS = new Set(['clear', 'reset'])
 
@@ -118,11 +126,11 @@ function Page() {
       })
     }
 
-    const stopWarmupLoop = startSandboxWarmup({
+    stopWarmup = startSandboxWarmup({
       sessionId: session.sessionId,
       tabId: session.tabId,
+      skipImmediate: isHotReload,
     })
-    stopWarmup = stopWarmupLoop
 
     const handleOnline = () => {
       if (!isInteractiveMode()) setStatusMode('online')

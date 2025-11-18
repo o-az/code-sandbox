@@ -23,6 +23,14 @@ const MODIFIER_META: Record<ModifierKey, { code: string; short: string }> = {
   Alt: { code: 'AltLeft', short: 'alt' },
   Meta: { code: 'MetaLeft', short: 'meta' },
 }
+
+const SPECIAL_KEYS = [
+  { value: 'Escape', label: 'ESC' },
+  { value: 'ArrowUp', label: '↑' },
+  { value: 'ArrowLeft', label: '←' },
+  { value: 'ArrowDown', label: '↓' },
+  { value: 'ArrowRight', label: '→' },
+] as const
 const LETTER_REGEX = /^[a-zA-Z]$/
 const KEYBOARD_OFFSET =
   'calc(env(safe-area-inset-bottom, 0px) + max(env(keyboard-inset-height, 0px), var(--keyboard-height, 0px)) + 4px)'
@@ -120,6 +128,13 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
     const modifiersSnapshot = snapshotModifiers()
     sendKeyPress(value)
     dispatch('virtualKey', { key: value, modifiers: modifiersSnapshot })
+    focusTerminalTextarea()
+  }
+
+  function handleSpecialKey(value: (typeof SPECIAL_KEYS)[number]['value']) {
+    const modifiersSnapshot = snapshotModifiers()
+    dispatch('virtualKey', { key: value, modifiers: modifiersSnapshot })
+    clearLatchedModifiers()
     focusTerminalTextarea()
   }
 
@@ -233,20 +248,34 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
         data-hidden={isHidden() ? 'true' : 'false'}
         data-element="extra-keyboard"
         style={{ bottom: KEYBOARD_OFFSET }}
-        class="fixed inset-x-0 z-1000 flex justify-center gap-3.5 bg-[#0c0f15] p-2.5 transition-[opacity,transform] duration-300 ease-out"
+        class="fixed inset-x-0 z-1000 flex flex-col items-center gap-2 bg-[#0c0f15] p-2.5 transition-[opacity,transform] duration-300 ease-out"
         classList={{
           'pointer-events-none translate-y-full opacity-0': isHidden(),
         }}>
-        <For each={MODIFIER_KEYS}>
-          {value => (
-            <KeyboardButton
-              value={value}
-              label={keyboardLabelFor(value)}
-              pressed={isModifierActive(value)}
-              onPress={handleButtonPress}
-            />
-          )}
-        </For>
+        <div class="flex flex-wrap justify-center gap-1.5">
+          <For each={SPECIAL_KEYS}>
+            {item => (
+              <button
+                type="button"
+                onClick={() => handleSpecialKey(item.value)}
+                class="flex h-6 min-w-[2.5rem] items-center justify-center rounded-[2px] bg-[#1f2933] px-3 text-[11px] font-semibold tracking-wide text-white transition duration-150 hover:bg-[#2b3642] active:scale-95 active:bg-[#11151a]">
+                {item.label}
+              </button>
+            )}
+          </For>
+        </div>
+        <div class="flex flex-wrap justify-center gap-1.5">
+          <For each={MODIFIER_KEYS}>
+            {value => (
+              <KeyboardButton
+                value={value}
+                label={keyboardLabelFor(value)}
+                pressed={isModifierActive(value)}
+                onPress={handleButtonPress}
+              />
+            )}
+          </For>
+        </div>
       </div>
       <button
         type="button"

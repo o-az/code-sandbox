@@ -6,15 +6,18 @@ export function startSandboxWarmup({
   tabId,
   onWarmupFailure,
   intervalMs = 4 * 60 * 1000,
+  skipImmediate = false,
 }: {
   sessionId: string
   tabId: string
   onWarmupFailure?: () => void
   intervalMs?: number
+  skipImmediate?: boolean
 }) {
   if (typeof window === 'undefined') return () => {}
 
-  void warmupSandbox(sessionId, tabId, false, onWarmupFailure)
+  if (!skipImmediate)
+    void warmupSandbox(sessionId, tabId, false, onWarmupFailure)
 
   const timer = window.setInterval(() => {
     void warmupSandbox(sessionId, tabId, true, onWarmupFailure)

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/cloudflare/sandbox:0.4.18
+FROM docker.io/cloudflare/sandbox:0.5.1
 
 ENV TERM="xterm-256color"
 ENV COLORTERM="truecolor"
