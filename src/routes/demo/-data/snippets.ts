@@ -5,7 +5,7 @@ export const htmlCodeSnippet = /* html */ `
   const iframeElement = document.querySelector('iframe#sandbox')
   const params = new URLSearchParams({
     embed: 'true',
-    cmd: encodeURIComponent(command)
+    cmd: command,
   })
   const url = new URL('https://sandbox.evm.workers.dev')
   url.search = params.toString()
@@ -13,7 +13,7 @@ export const htmlCodeSnippet = /* html */ `
   Object.assign(iframeElement, { src: url.toString() })
 
   iframeElement.addEventListener('load', () => {
-    iframeElement.contentWindow.postMessage({ type: 'run' }, '*')
+    iframeElement.contentWindow.postMessage({ type: 'execute' }, '*')
   })
 </script>
 
