@@ -5,10 +5,10 @@ import { getSandbox } from '@cloudflare/sandbox'
 import { createFileRoute } from '@tanstack/solid-router'
 
 import {
+  removeActiveTab,
+  readSandboxSession,
   clearSandboxSession,
   ensureSandboxSession,
-  readSandboxSession,
-  removeActiveTab,
 } from '#lib/server-sandbox.ts'
 
 const ResetPayloadSchema = z.object({

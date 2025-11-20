@@ -364,7 +364,7 @@ function KeyboardButton(props: KeyboardButtonProps) {
       data-key={props.value}
       data-element="extra-keyboard-key"
       data-pressed={props.pressed ? 'true' : undefined}
-      class="flex h-6 items-center justify-center rounded-[2px] bg-[#3a3a3c] px-2 text-xs font-mono text-white transition duration-150 hover:bg-[#48484a] active:scale-95 active:bg-[#2c2c2e]"
+      class="flex h-6 items-center justify-center rounded-xs bg-[#3a3a3c] px-2 text-xs font-mono text-white transition duration-150 hover:bg-[#48484a] active:scale-95 active:bg-[#2c2c2e]"
       classList={{
         'bg-[#58a6ff] font-semibold text-[#0d1117]': props.pressed,
       }}>

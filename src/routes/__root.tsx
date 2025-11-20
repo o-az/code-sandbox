@@ -10,7 +10,6 @@ import * as Solid from 'solid-js'
 import { HydrationScript } from 'solid-js/web'
 
 import appCss from '#style.css?url'
-
 import { DevTools } from '#components/dev-tools.tsx'
 import xtermCss from '@xterm/xterm/css/xterm.css?url'
 import { SessionProvider } from '#context/session.tsx'

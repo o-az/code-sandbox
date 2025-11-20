@@ -1,7 +1,7 @@
 import { debounce } from '@solid-primitives/scheduled'
-import { makeEventListener } from '@solid-primitives/event-listener'
 import { createFileRoute } from '@tanstack/solid-router'
 import { createSignal, onCleanup, onMount } from 'solid-js'
+import { makeEventListener } from '@solid-primitives/event-listener'
 
 import {
   useSession,
