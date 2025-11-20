@@ -10,9 +10,9 @@ import * as Solid from 'solid-js'
 import { HydrationScript } from 'solid-js/web'
 
 import appCss from '#style.css?url'
-import { DevTools } from '#components/dev-tools.tsx'
 import xtermCss from '@xterm/xterm/css/xterm.css?url'
 import { SessionProvider } from '#context/session.tsx'
+import { DevTools, useDevTools } from '#components/dev-tools.tsx'
 import { DefaultCatchBoundary } from '#components/default-catch-boundary.tsx'
 
 export const Route = createRootRoute({
@@ -44,6 +44,8 @@ export const Route = createRootRoute({
 })
 
 function AppShell() {
+  useDevTools()
+
   return (
     <SessionProvider>
       <Solid.Suspense>

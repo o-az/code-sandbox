@@ -12,7 +12,7 @@ export default defineConfig(config => {
 
   return {
     plugins: [
-      VitePluginTanstackDevtools(),
+      VitePluginTanstackDevtools({ removeDevtoolsOnBuild: true }),
       VitePluginTSConfigPaths(),
       VitePluginCloudflare({
         configPath: './wrangler.json',
@@ -29,11 +29,16 @@ export default defineConfig(config => {
     server: {
       port: Number(env.PORT || randomIntInclusive(3_100, 8_100)),
     },
-    build: {
-      target: 'esnext',
+    oxc: {
+      target: ['esnext'],
     },
-    esbuild: {
-      drop: ['console', 'debugger'],
+    build: {
+      minify: 'oxc',
+      rolldownOptions: {
+        output: {
+          minify: true,
+        },
+      },
     },
   }
 })

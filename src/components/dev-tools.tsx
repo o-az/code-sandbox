@@ -1,22 +1,20 @@
-import { createSignal, Show } from 'solid-js'
-import { createShortcut } from '@solid-primitives/keyboard'
-import { TanStackRouterDevtools } from '@tanstack/solid-router-devtools'
+import { onMount } from 'solid-js'
+
+export function useDevTools() {
+  if (!import.meta.env.DEV) return null
+
+  onMount(() => {
+    if (import.meta.env.DEV)
+      void import('eruda').then(({ default: eruda }) => eruda.init())
+  })
+}
 
 export function DevTools() {
-  const [showDevTools, setShowDevTools] = createSignal(import.meta.env.DEV)
-
-  createShortcut(['Control', '1'], _ => {
-    setShowDevTools(!showDevTools())
-  })
-
-  if (!import.meta.env.DEV) return <></>
-
   return (
-    <Show when={showDevTools()}>
-      <TanStackRouterDevtools
-        position="bottom-left"
-        data-devtool-name="tanstack-router-devtools"
-      />
-    </Show>
+    <div class="pointer-events-none hidden invisible size-0 opacity-0">
+      {/*
+       * TODO: add tanstack solid devtools back when it no longer breaks
+       */}
+    </div>
   )
 }
