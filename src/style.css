@@ -123,6 +123,11 @@ input[type="number"] {
   max-height: auto;
 }
 
+@utility size-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
 @utility min-size-screen {
   min-width: 100vw;
   min-height: 100vh;

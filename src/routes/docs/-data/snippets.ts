@@ -1,28 +1,32 @@
 export const htmlCodeSnippet = /* html */ `
-<script type="module">
-  const command = 'npx --yes cowsay@latest "mooo"'
+<html>
+  <script type="module">
+    const command = 'npx --yes cowsay@latest "mooo"'
+  
+    const iframe = document.querySelector('iframe#sandbox')
 
-  const iframeElement = document.querySelector('iframe#sandbox')
-  const params = new URLSearchParams({
-    embed: 'true',
-    cmd: command,
-  })
-  const url = new URL('https://sandbox.evm.workers.dev')
-  url.search = params.toString()
+    const params = new URLSearchParams({
+      embed: 'true',
+      cmd: command,
+    })
+    const url = new URL('https://sandbox.evm.workers.dev')
+    url.search = params.toString()
+  
+    Object.assign(iframe, { src: url.toString() })
+  
+    iframe.addEventListener('load', () => {
+      iframe.contentWindow.postMessage({ type: 'execute' }, '*')
+    })
+  </script>
+  
+  <iframe
+    width="100%"
+    id="sandbox"
+    height="100%"
+    title="Sandbox"
+  ></iframe>
 
-  Object.assign(iframeElement, { src: url.toString() })
-
-  iframeElement.addEventListener('load', () => {
-    iframeElement.contentWindow.postMessage({ type: 'execute' }, '*')
-  })
-</script>
-
-<iframe
-  width="100%"
-  id="sandbox"
-  height="100%"
-  title="Sandbox"
-/>
+</html>
 `
 
 export const reactCodeSnippet = /* tsx */ `

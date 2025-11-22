@@ -11,11 +11,10 @@ _
 !.env.example
 *.tgz
 *.log
-
 logs
 .wrangler
 _old
 .tanstack
-
 _opentui
-_*
+.vite-inspect
+.sonda

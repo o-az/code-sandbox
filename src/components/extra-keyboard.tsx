@@ -14,6 +14,12 @@ import { useKeyDownEvent } from '@solid-primitives/keyboard'
 import { createActiveElement } from '@solid-primitives/active-element'
 import { createEventDispatcher } from '@solid-primitives/event-dispatcher'
 
+import { useEmbedDetector } from './embed-detector.tsx'
+
+/**
+ * disabled and hidden in embed mode
+ */
+
 type ModifierKey = (typeof MODIFIER_KEYS)[number]
 
 const MODIFIER_KEYS = ['Control', 'Shift', 'Alt', 'Meta'] as const
@@ -241,6 +247,9 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
 
     writeToTerminal(value)
   }
+
+  const insideIFrame = useEmbedDetector()
+  if (insideIFrame()) return null
 
   return (
     <Show when={ready()}>

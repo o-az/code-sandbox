@@ -5,43 +5,82 @@ import { transformerNotationFocus } from '@shikijs/transformers'
 import { batch, createSignal, Match, onMount, Switch } from 'solid-js'
 import { createOnigurumaEngine, loadWasm } from 'shiki/engine/oniguruma'
 import { createHighlighterCore, type ThemeRegistration } from 'shiki/core'
-import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions'
 
+import { theme } from './-data/theme.ts'
 import type { MaybePromise } from '#lib/types.ts'
 import { htmlCodeSnippet } from './-data/snippets.ts'
 
-const generateCode = createServerFn({ method: 'GET' })
-  .middleware([staticFunctionMiddleware])
-  .handler(async () => {
-    try {
-      await loadWasm(import('shiki/onig.wasm'))
+const generateCode = createServerFn({ method: 'GET' }).handler(async () => {
+  try {
+    await loadWasm(import('shiki/onig.wasm'))
 
-      const highlighter = await createHighlighterCore({
-        themes: [import('@shikijs/themes/houston')],
-        langs: [import('@shikijs/langs/tsx'), import('@shikijs/langs/html')],
+    const highlighter = await createHighlighterCore({
+      themes: [import('@shikijs/themes/houston')],
+      langs: [import('@shikijs/langs/tsx'), import('@shikijs/langs/html')],
 
-        engine: createOnigurumaEngine(await import('shiki/wasm')),
-      })
+      engine: createOnigurumaEngine(await import('shiki/wasm')),
+    })
 
-      const { default: idxTheme } = await import('./-data/theme.json', {
-        with: { type: 'json' },
-      })
-
-      return highlighter.codeToHtml(htmlCodeSnippet.trimStart(), {
-        lang: 'html',
-        transformers: [transformerNotationFocus()],
-        theme: idxTheme as ThemeRegistration,
-      })
-    } catch (error) {
-      console.info('error in serverfn')
-      console.error(error)
-    }
-  })
+    return highlighter.codeToHtml(htmlCodeSnippet.trimStart(), {
+      lang: 'html',
+      transformers: [transformerNotationFocus()],
+      theme: theme as ThemeRegistration,
+    })
+  } catch (error) {
+    console.info('error in serverfn')
+    console.error(error)
+  }
+})
 
 export const Route = createFileRoute('/docs')({
   component: RouteComponent,
   loader: () => generateCode(),
 })
+
+function RouteComponent() {
+  const code = Route.useLoaderData()
+  const [codeElement, setCodeElement] = createSignal<
+    (HTMLElement & { setHTMLUnsafe?: (value: string) => void }) | undefined
+  >()
+
+  const copyHighlightedSnippet = async () =>
+    await writeClipboard(
+      codeElement()?.textContent?.trim() ?? htmlCodeSnippet.trim(),
+    )
+
+  onMount(() => {
+    if (code() && typeof code() === 'string')
+      codeElement()?.setHTMLUnsafe?.(`${code()}`)
+  })
+
+  return (
+    <main class="border-y-green-400 border-y-[1.5px] pb-6 min-size-max flex items-center overflow-y-auto">
+      <div class="mt-20 min-size-max overflow-auto gap-y-4 flex flex-col w-[720px] items-center">
+        <h1 class="md:text-4xl text-2xl font-black text-center mt-12">
+          Sandbox Embed Guide
+        </h1>
+        <h2>
+          <a
+            href="https://git--019aab4bf72f75ba9fff5a382032de2d.web.val.run/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-blue-400 font-semibold uppercase font-mono">
+            live demo
+          </a>{' '}
+          🌐
+        </h2>
+        <div class="bg-[#171F2B] w-full flex justify-center sm:max-w-[620px] max-w-full">
+          <article
+            ref={setCodeElement}
+            data-element="iframe-code-block"
+            // show a light border on hover
+            class="text-sm self-center shrink-0 w-full sm:max-w-[620px] max-w-full rounded-sm"
+          />
+        </div>
+      </div>
+    </main>
+  )
+}
 
 function CopyButton(props: { onCopy: () => MaybePromise<void> }) {
   const [isCopied, setIsCopied] = createSignal(false)
@@ -95,59 +134,5 @@ function CopyButton(props: { onCopy: () => MaybePromise<void> }) {
         </Match>
       </Switch>
     </button>
-  )
-}
-
-function RouteComponent() {
-  const code = Route.useLoaderData()
-  const [codeElement, setCodeElement] = createSignal<
-    (HTMLElement & { setHTMLUnsafe?: (value: string) => void }) | undefined
-  >()
-
-  const copyHighlightedSnippet = async () =>
-    await writeClipboard(
-      codeElement()?.textContent?.trim() ?? htmlCodeSnippet.trim(),
-    )
-
-  onMount(() => {
-    if (code() && typeof code() === 'string')
-      codeElement()?.setHTMLUnsafe?.(`${code()}`)
-  })
-
-  return (
-    <main class="border-y-green-400 border-y-[1.5px] pb-6 min-size-max flex items-center overflow-y-auto">
-      <div class="mt-20 min-size-max overflow-auto gap-y-4 flex flex-col w-[720px] items-center">
-        <h1 class="text-2xl font-black text-center mt-18 sm:mt-12">
-          Sandbox Embed Demo
-        </h1>
-        <div class="relative">
-          <div class="absolute top-0 right-0 mt-2 size-6">
-            <CopyButton onCopy={copyHighlightedSnippet} />
-          </div>
-          <article
-            ref={setCodeElement}
-            data-element="iframe-code-block"
-            // show a light border on hover
-            class="text-sm self-center shrink-0 w-full sm:max-w-2xl max-w-full rounded-sm"
-          />
-        </div>
-        <div class="text-balance shrink-0">
-          <p class="mt-4 max-w-3xl text-center">
-            Fugiat culpa aute duis velit. Irure velit anim ut ad voluptate minim
-            ex excepteur. Deserunt duis ex aliqua exercitation enim occaecat
-            pariatur officia nostrud mollit laborum commodo.
-          </p>
-
-          <p class="mt-4 max-w-3xl text-center">
-            Velit consectetur non sint. In excepteur pariatur excepteur ipsum
-            fugiat sunt id dolore sit dolore pariatur laborum in officia. Ex
-            sint enim ea qui dolor ullamco labore consequat Lorem exercitation.
-            Laborum ut aliquip enim cillum voluptate do ullamco ex culpa ea
-            consequat est. Officia nisi laboris quis dolore non nisi duis sint
-            enim irure.
-          </p>
-        </div>
-      </div>
-    </main>
   )
 }

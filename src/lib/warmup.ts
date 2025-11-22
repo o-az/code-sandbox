@@ -16,6 +16,10 @@ export function startSandboxWarmup({
 }) {
   if (typeof window === 'undefined') return () => {}
 
+  // Only run the warmup loop when the terminal route is active. Navigating to
+  // static routes like /demo or /docs should not boot the sandbox container.
+  if (window.location.pathname !== '/') return () => {}
+
   if (!skipImmediate)
     void warmupSandbox(sessionId, tabId, false, onWarmupFailure)
 

@@ -1,6 +1,8 @@
 import NodeProcess from 'node:process'
+import VitePluginSonda from 'sonda/vite'
 import { defineConfig, loadEnv } from 'vite'
 import VitePluginInfo from 'unplugin-info/vite'
+import VitePluginInspect from 'vite-plugin-inspect'
 import VitePluginTSConfigPaths from 'vite-tsconfig-paths'
 import { default as VitePluginSolid } from 'vite-plugin-solid'
 import { default as VitePluginTailwindCSS } from '@tailwindcss/vite'
@@ -11,26 +13,32 @@ import { tanstackStart as VitePluginTanstackStart } from '@tanstack/solid-start/
 export default defineConfig(config => {
   const env = loadEnv(config.mode, NodeProcess.cwd(), '')
 
+  const plugins = [
+    VitePluginTanstackDevtools({ removeDevtoolsOnBuild: true }),
+    VitePluginInfo({
+      cloudflare: true,
+      github: 'https://github.com/o-az/sandbox',
+    }),
+    VitePluginTSConfigPaths(),
+    VitePluginCloudflare({
+      viteEnvironment: { name: 'ssr' },
+    }),
+    VitePluginTailwindCSS(),
+    VitePluginTanstackStart({
+      start: { entry: './src/start.ts' },
+      server: { entry: './src/server.ts' },
+      client: { entry: './src/client.ts' },
+    }),
+    VitePluginSolid({ ssr: true }),
+  ]
+
+  if (env.PLUGIN_INSPECT === 'true')
+    plugins.unshift(VitePluginInspect({ build: true }))
+
+  if (env.PLUGIN_SONDA === 'true') plugins.unshift([VitePluginSonda()])
+
   return {
-    plugins: [
-      VitePluginTanstackDevtools({ removeDevtoolsOnBuild: true }),
-      VitePluginInfo({
-        cloudflare: true,
-        github: 'https://github.com/o-az/sandbox',
-      }),
-      VitePluginTSConfigPaths(),
-      VitePluginCloudflare({
-        configPath: './wrangler.json',
-        viteEnvironment: { name: 'ssr' },
-      }),
-      VitePluginTailwindCSS(),
-      VitePluginTanstackStart({
-        start: { entry: './src/start.ts' },
-        server: { entry: './src/server.ts' },
-        client: { entry: './src/client.ts' },
-      }),
-      VitePluginSolid({ ssr: true }),
-    ],
+    plugins,
     server: {
       port: Number(env.PORT || randomIntInclusive(3_100, 8_100)),
     },
@@ -39,9 +47,13 @@ export default defineConfig(config => {
     },
     build: {
       minify: 'oxc',
+      outDir: 'dist',
+      emptyOutDir: true,
       rolldownOptions: {
         output: {
-          minify: true,
+          cleanDir: true,
+          minify: env.VITE_MINIFY === 'true',
+          sourcemap: env.PLUGIN_SONDA === 'true',
         },
       },
     },
