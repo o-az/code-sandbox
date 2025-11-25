@@ -54,8 +54,8 @@ function RouteComponent() {
   })
 
   return (
-    <main class="border-y-green-400 border-y-[1.5px] pb-6 min-size-max flex items-center overflow-y-auto">
-      <div class="mt-20 min-size-max overflow-auto gap-y-4 flex flex-col w-[720px] items-center">
+    <main class="flex min-h-dvh flex-col items-center overflow-y-auto border-y-[1.5px] border-y-green-400 pb-6">
+      <div class="mt-20 flex w-full max-w-[720px] flex-col items-center gap-y-4">
         <h1 class="md:text-4xl text-2xl font-black text-center mt-12">
           Sandbox Embed Guide
         </h1>
