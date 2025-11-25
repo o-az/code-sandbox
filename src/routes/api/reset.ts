@@ -9,7 +9,7 @@ import {
   readSandboxSession,
   clearSandboxSession,
   ensureSandboxSession,
-} from '#lib/server-sandbox.ts'
+} from '#lib/sandbox/server.ts'
 
 const ResetPayloadSchema = z.object({
   sessionId: z.string({ error: 'Missing sessionId' }),

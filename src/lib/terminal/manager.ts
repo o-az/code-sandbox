@@ -35,6 +35,7 @@ export class TerminalManager {
   #xtermReadline: Readline
   #initialized = false
   #isMobile = isMobileDevice()
+  #resizeObserver: ResizeObserver | null = null
 
   constructor() {
     this.#terminal = new Terminal({
@@ -104,6 +105,13 @@ export class TerminalManager {
     this.#terminal.open(element)
     // @ts-expect-error
     window.xterm = this.#terminal
+
+    // ResizeObserver for container size changes (more reliable than window resize)
+    this.#resizeObserver = new ResizeObserver(() => {
+      // Use requestAnimationFrame to debounce rapid resize events
+      requestAnimationFrame(() => this.#fitAddon.fit())
+    })
+    this.#resizeObserver.observe(element)
 
     if (this.#webglAddon) {
       try {
@@ -191,6 +199,8 @@ export class TerminalManager {
 
   dispose() {
     if (!this.#initialized) return
+    this.#resizeObserver?.disconnect()
+    this.#resizeObserver = null
     this.#webglAddon?.dispose()
     this.#fitAddon.dispose()
     this.#searchAddon.dispose()

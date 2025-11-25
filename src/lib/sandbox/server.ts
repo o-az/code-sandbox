@@ -3,7 +3,7 @@ import { makeObjectStorage } from '@solid-primitives/storage'
 
 export type SandboxRecord = {
   sandboxId: string
-  activeTabs: string[]
+  activeTabs: Array<string>
 }
 
 type SandboxGlobal = typeof globalThis & {

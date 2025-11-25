@@ -4,7 +4,7 @@ import { json } from '@tanstack/solid-start'
 import { getSandbox } from '@cloudflare/sandbox'
 import { createFileRoute } from '@tanstack/solid-router'
 
-import { ensureSandboxSession } from '#lib/server-sandbox.ts'
+import { ensureSandboxSession } from '#lib/sandbox/server.ts'
 
 const DEFAULT_WS_PORT = 8080
 

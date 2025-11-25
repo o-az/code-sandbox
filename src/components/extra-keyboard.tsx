@@ -177,14 +177,11 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
     if (!textareaEl) return false
     if (key.length !== 1 || !LETTER_REGEX.test(key)) return false
     const upperKey = key.toUpperCase()
-    const keyCode = upperKey.charCodeAt(0)
     dispatchSyntheticEvent(() =>
       textareaEl.dispatchEvent(
         new KeyboardEvent('keydown', {
           key: upperKey,
           code: `Key${upperKey}`,
-          keyCode,
-          which: keyCode,
           ctrlKey: true,
           shiftKey: false,
           altKey: false,

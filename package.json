@@ -15,7 +15,7 @@
     "check:types": "bun tsgo --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "^0.5.2",
+    "@cloudflare/sandbox": "^0.5.3",
     "@solid-primitives/active-element": "^2.1.3",
     "@solid-primitives/clipboard": "^1.6.2",
     "@solid-primitives/connectivity": "^0.4.3",

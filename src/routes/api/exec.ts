@@ -4,7 +4,7 @@ import { json } from '@tanstack/solid-start'
 import { createFileRoute } from '@tanstack/solid-router'
 import { getSandbox, type ExecResult } from '@cloudflare/sandbox'
 
-import { ensureSandboxSession } from '#lib/server-sandbox.ts'
+import { ensureSandboxSession } from '#lib/sandbox/server.ts'
 
 const DEFAULT_TIMEOUT_MS = 25_000
 

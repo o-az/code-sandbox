@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
-import { randomUUID } from 'node:crypto'
-
 import { App } from 'uWebSockets.js'
+import { randomUUID } from 'node:crypto'
 import crossws from 'crossws/adapters/uws'
 import { spawn, type IPty } from 'node-pty'
 
@@ -159,9 +158,14 @@ function spawnPty(
       ...process.env,
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
+      FORCE_COLOR: '1',
       // PS1 escape codes wrapped in \[...\] for bash readline cursor calculation
       // Using \e for escape (bash interprets this)
       PS1: '\\[\\033[32m\\]$ \\[\\033[0m\\]',
+      // Color customization for CLI tools (note: doesn't force colors, just customizes them)
+      JQ_COLORS: '1;30:0;37:0;37:0;37:0;32:1;37:1;37',
+      GCC_COLORS:
+        'error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01',
     } as Record<string, string>,
   })
 

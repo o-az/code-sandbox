@@ -4,7 +4,7 @@ import { json } from '@tanstack/solid-start'
 import { getSandbox } from '@cloudflare/sandbox'
 import { createFileRoute } from '@tanstack/solid-router'
 
-import { ensureSandboxSession, getActiveTabCount } from '#lib/server-sandbox.ts'
+import { ensureSandboxSession, getActiveTabCount } from '#lib/sandbox/server.ts'
 
 const HEALTH_TIMEOUT_MS = 5_000
 
