@@ -1,15 +1,12 @@
-import { Show, createSignal, onMount } from 'solid-js'
+import { Show, createSignal } from 'solid-js'
 
 import {
   ExtraKeyboard,
   type ExtraKeyboardProps,
 } from '#components/menu/extra-keyboard.tsx'
+import { RetroButton } from '#components/menu/retro.tsx'
 import { ShareButton } from '#components/menu/share-button.tsx'
 import { useEmbedDetector } from '#components/embed-detector.tsx'
-
-const RETRO_FONT = 'Glass TTY VT220'
-const DEFAULT_FONT = 'Lilex'
-const FONT_STORAGE_KEY = 'terminal-font'
 
 type MenuProps = {
   prefilledCommand?: string | null
@@ -19,26 +16,10 @@ type MenuProps = {
 
 export function Menu(props: MenuProps) {
   const [showExtraKeys, setShowExtraKeys] = createSignal(false)
-  const [retroFont, setRetroFont] = createSignal(false)
   const isEmbedded = useEmbedDetector()
-
-  onMount(() => {
-    const stored = localStorage.getItem(FONT_STORAGE_KEY)
-    if (stored === RETRO_FONT) {
-      setRetroFont(true)
-    }
-  })
 
   function toggleExtraKeys() {
     setShowExtraKeys(previous => !previous)
-  }
-
-  function toggleRetroFont() {
-    const newValue = !retroFont()
-    const fontFamily = newValue ? RETRO_FONT : DEFAULT_FONT
-    localStorage.setItem(FONT_STORAGE_KEY, fontFamily)
-    // ghostty-web doesn't support font changes after open(), reload to apply
-    window.location.reload()
   }
 
   return (
@@ -61,12 +42,7 @@ export function Menu(props: MenuProps) {
 
         <div class="my-0.5 h-px w-full bg-white/10" />
 
-        <MenuButton
-          title={retroFont() ? 'Use default font' : 'Use retro font'}
-          icon={<RetroFontIcon />}
-          active={retroFont()}
-          onClick={toggleRetroFont}
-        />
+        <RetroButton />
 
         <div class="my-0.5 h-px w-full bg-white/10" />
 
@@ -162,25 +138,6 @@ function KeyboardIcon() {
       <line x1="14" y1="12" x2="14" y2="12" />
       <line x1="18" y1="12" x2="18" y2="12" />
       <line x1="7" y1="16" x2="17" y2="16" />
-    </svg>
-  )
-}
-
-function RetroFontIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 14 14"
-      fill="none"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true">
-      <path d="M7.232 10.617c.349.048.88-.157 1.3-.478.224-.172.425-.383.57-.596" />
-      <path d="M13.366 5.678q.133.642.134 1.322A6.5 6.5 0 1 1 .634 5.678M12.768 4A6.5 6.5 0 0 0 7 .5 6.5 6.5 0 0 0 1.232 4" />
-      <path d="M.5 4.75V4H7v.75a3.25 3.25 0 1 1-6.5 0m6.5 0V4h6.5v.75a3.25 3.25 0 0 1-6.5 0" />
     </svg>
   )
 }

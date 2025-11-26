@@ -34,6 +34,9 @@
   ],
   "languages": {
     "HTML": {
+      "language_servers": [
+        "biome"
+      ],
       "code_actions_on_format": {
         "source.fixAll.biome": true,
         "source.organizeImports.biome": true
@@ -45,6 +48,9 @@
       }
     },
     "JSON": {
+      "language_servers": [
+        "biome"
+      ],
       "code_actions_on_format": {
         "source.fixAll.biome": true,
         "source.organizeImports.biome": true
@@ -56,6 +62,9 @@
       }
     },
     "JSONC": {
+      "language_servers": [
+        "biome"
+      ],
       "code_actions_on_format": {
         "source.fixAll.biome": true,
         "source.organizeImports.biome": true
@@ -67,6 +76,9 @@
       }
     },
     "JSDoc": {
+      "language_servers": [
+        "biome"
+      ],
       "code_actions_on_format": {
         "source.fixAll.astro": true,
         "source.organizeImports.biome": true
@@ -78,6 +90,12 @@
       }
     },
     "TSX": {
+      "language_servers": [
+        "biome",
+        "typescript-language-server",
+        "tailwindcss-language-server",
+        "..."
+      ],
       "code_actions_on_format": {
         "source.fixAll.biome": true,
         "source.organizeImports.biome": true
@@ -89,6 +107,11 @@
       }
     },
     "JavaScript": {
+      "language_servers": [
+        "biome",
+        "typescript-language-server",
+        "..."
+      ],
       "code_actions_on_format": {
         "source.fixAll.biome": true,
         "source.organizeImports.biome": true
@@ -100,9 +123,29 @@
       }
     },
     "TypeScript": {
+      "language_servers": [
+        "biome",
+        "typescript-language-server",
+        "..."
+      ],
       "code_actions_on_format": {
         "source.fixAll.biome": true,
         "source.organizeImports.biome": true
+      },
+      "formatter": {
+        "language_server": {
+          "name": "biome"
+        }
+      }
+    },
+    "CSS": {
+      "language_servers": [
+        "biome",
+        "tailwindcss-language-server",
+        "..."
+      ],
+      "code_actions_on_format": {
+        "source.fixAll.biome": true
       },
       "formatter": {
         "language_server": {
