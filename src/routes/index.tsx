@@ -26,7 +26,7 @@ hot?.dispose(data => {
   data.hmrReloaded = true
 })
 
-const PROMPT = ' \u001b[32m$\u001b[0m '
+const PROMPT = '\u001b[32m$\u001b[0m '
 const LOCAL_COMMANDS = new Set(['clear', 'reset'])
 
 export const Route = createFileRoute('/')({
@@ -128,7 +128,7 @@ function Page() {
 
       <div
         id="terminal-container"
-        class="min-h-0 flex-1 overflow-hidden bg-[#0d1117]">
+        class="min-h-0 flex-1 overflow-hidden bg-[#0d1117] pl-4 pt-2">
         <div
           id="terminal"
           ref={terminalRef}

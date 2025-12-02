@@ -87,8 +87,12 @@ export function useTerminalSession({
 
   // Initialize terminal
   let altNavigationDelegate: ((event: KeyboardEvent) => boolean) | undefined
+  let clearLineDelegate: (() => boolean) | undefined
+  let jumpToLineEdgeDelegate: ((edge: 'start' | 'end') => boolean) | undefined
   const terminal = terminalManager.init(terminalElement, {
     onAltNavigation: event => altNavigationDelegate?.(event) ?? false,
+    onClearLine: () => clearLineDelegate?.() ?? false,
+    onJumpToLineEdge: edge => jumpToLineEdgeDelegate?.(edge) ?? false,
   })
 
   const fitAddon = terminalManager.fitAddon
@@ -137,6 +141,8 @@ export function useTerminalSession({
     isInteractiveMode: () => state.isInteractiveMode(),
   })
   altNavigationDelegate = virtualKeyboardBridge.handleAltNavigation
+  clearLineDelegate = virtualKeyboardBridge.handleClearLine
+  jumpToLineEdgeDelegate = virtualKeyboardBridge.handleJumpToLineEdge
 
   // Keyboard insets
   cleanupInsets = initKeyboardInsets()
@@ -181,6 +187,8 @@ export function useTerminalSession({
   // This fires whenever terminal dimensions actually change, more reliable than window resize
   terminal.onResize(({ cols, rows }) => {
     notifyResize({ cols, rows })
+    // Refresh readline display after resize to maintain cursor position
+    virtualKeyboardBridge.handleResize()
   })
 
   // Window resize triggers fit(), which may trigger term.onResize if dimensions change

@@ -5,6 +5,64 @@ import { TerminalSerializeAdapter } from '#lib/terminal/serialize.ts'
 
 export type TerminalInitOptions = {
   onAltNavigation?: (event: KeyboardEvent) => boolean
+  onClearLine?: () => boolean
+  onJumpToLineEdge?: (edge: 'start' | 'end') => boolean
+}
+
+const FONT_STORAGE_KEY = 'terminal-font'
+const DEFAULT_FONT = 'Lilex'
+const RETRO_FONT = 'Glass TTY VT220'
+
+const DEFAULT_THEME = {
+  background: '#0d1117',
+  foreground: '#f0f6fc',
+  cursor: '#58a6ff',
+  selectionBackground: '#58a6ff33',
+  black: '#0d1117',
+  red: '#ff7b72',
+  green: '#3fb950',
+  yellow: '#d29922',
+  blue: '#58a6ff',
+  magenta: '#bc8cff',
+  cyan: '#39c5cf',
+  white: '#f0f6fc',
+  brightBlack: '#6e7681',
+  brightRed: '#ffa198',
+  brightGreen: '#56d364',
+  brightYellow: '#e3b341',
+  brightBlue: '#79c0ff',
+  brightMagenta: '#d2a8ff',
+  brightCyan: '#56d4dd',
+  brightWhite: '#f0f6fc',
+}
+
+// Brighter, more saturated colors for retro CRT aesthetic
+const RETRO_THEME = {
+  background: '#0a0a0a',
+  foreground: '#33ff33',
+  cursor: '#33ff33',
+  selectionBackground: '#33ff3344',
+  black: '#0a0a0a',
+  red: '#ff5555',
+  green: '#33ff33',
+  yellow: '#ffff55',
+  blue: '#55ffff',
+  magenta: '#ff55ff',
+  cyan: '#55ffff',
+  white: '#ffffff',
+  brightBlack: '#555555',
+  brightRed: '#ff8888',
+  brightGreen: '#66ff66',
+  brightYellow: '#ffff88',
+  brightBlue: '#88ffff',
+  brightMagenta: '#ff88ff',
+  brightCyan: '#88ffff',
+  brightWhite: '#ffffff',
+}
+
+export function getStoredFontFamily(): string {
+  if (typeof localStorage === 'undefined') return DEFAULT_FONT
+  return localStorage.getItem(FONT_STORAGE_KEY) ?? DEFAULT_FONT
 }
 
 export class TerminalManager {
@@ -13,38 +71,21 @@ export class TerminalManager {
   #serializeAddon: TerminalSerializeAdapter
   #xtermReadline: Readline
   #initialized = false
-  #resizeObserver: ResizeObserver | null = null
+  #fontFamily: string
+  #isRetroFont: boolean
 
   constructor() {
+    this.#fontFamily = getStoredFontFamily()
+    this.#isRetroFont = this.#fontFamily === RETRO_FONT
+
     this.#terminal = new Terminal({
-      fontSize: 17,
+      fontSize: this.#isRetroFont ? 20 : 17,
       scrollback: 5_000,
       convertEol: true,
       cursorBlink: true,
       cursorStyle: 'underline',
-      fontFamily: 'Lilex, monospace',
-      theme: {
-        background: '#0d1117',
-        foreground: '#f0f6fc',
-        cursor: '#58a6ff',
-        selectionBackground: '#58a6ff33',
-        black: '#0d1117',
-        red: '#ff7b72',
-        green: '#3fb950',
-        yellow: '#d29922',
-        blue: '#58a6ff',
-        magenta: '#bc8cff',
-        cyan: '#39c5cf',
-        white: '#f0f6fc',
-        brightBlack: '#6e7681',
-        brightRed: '#ffa198',
-        brightGreen: '#56d364',
-        brightYellow: '#e3b341',
-        brightBlue: '#79c0ff',
-        brightMagenta: '#d2a8ff',
-        brightCyan: '#56d4dd',
-        brightWhite: '#f0f6fc',
-      },
+      fontFamily: `"${this.#fontFamily}", monospace`,
+      theme: this.#isRetroFont ? RETRO_THEME : DEFAULT_THEME,
     })
 
     const terminalOptions = this.#terminal.options as {
@@ -64,53 +105,112 @@ export class TerminalManager {
 
   init(
     element: (HTMLDivElement & { xterm?: Terminal }) | null | undefined,
-    { onAltNavigation }: TerminalInitOptions = {},
+    {
+      onAltNavigation,
+      onClearLine,
+      onJumpToLineEdge,
+    }: TerminalInitOptions = {},
   ) {
     if (this.#initialized) return this.#terminal
     if (!element) throw new Error('Terminal element is required')
 
+    // Load addons BEFORE opening (per ghostty-web demo best practice)
+    this.#terminal.loadAddon(this.#fitAddon)
+    this.#terminal.loadAddon(this.#xtermReadline)
+
+    // Open terminal (WASM already initialized via waitForTerminalRuntime)
     this.#terminal.open(element)
+
     // Expose terminal for debugging in development
     ;(window as Window & { xterm?: Terminal }).xterm = this.#terminal
 
-    // ResizeObserver for container size changes (more reliable than window resize)
-    this.#resizeObserver = new ResizeObserver(() => {
-      // Use requestAnimationFrame to debounce rapid resize events
-      requestAnimationFrame(() => this.#fitAddon.fit())
-    })
-    this.#resizeObserver.observe(element)
-
-    this.#terminal.loadAddon(this.#fitAddon)
-    this.#terminal.loadAddon(this.#xtermReadline)
+    // Use FitAddon's built-in observeResize() (per ghostty-web demo)
+    this.#fitAddon.fit()
+    this.#fitAddon.observeResize()
 
     const usesGhosttySemantics =
       typeof (this.#terminal as unknown as { ghostty?: unknown }).ghostty !==
       'undefined'
 
     this.#terminal.attachCustomKeyEventHandler(event => {
+      // Handle Cmd/Ctrl + R for refresh explicitly
+      if (
+        event.type === 'keydown' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'r'
+      ) {
+        window.location.reload()
+        return !!usesGhosttySemantics
+      }
+
+      // Allow other browser shortcuts to pass through
+      const key = event.key.toLowerCase()
+      const isBrowserShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        (key === 't' || // New tab
+          key === 'w' || // Close tab
+          key === 'n' || // New window
+          key === 'l' || // Focus address bar
+          key === 'f' || // Find
+          key === '+' || // Zoom in
+          key === '-' || // Zoom out
+          key === '0') // Reset zoom
+
+      if (isBrowserShortcut) {
+        // Let browser handle it - return false for ghostty, true for xterm
+        return !usesGhosttySemantics
+      }
+
       let handled = false
 
-      // Ctrl + Left Arrow (beginning of line)
+      // Alt key combinations - delegate to onAltNavigation first
       if (
-        event.ctrlKey &&
-        event.key === 'ArrowLeft' &&
-        event.type === 'keydown'
-      ) {
-        this.#terminal.write('\x01') // Ctrl+A (ASCII SOH)
-        handled = true
-      } else if (
-        event.ctrlKey &&
-        event.key === 'ArrowRight' &&
-        event.type === 'keydown'
-      ) {
-        // Ctrl + Right Arrow (end of line)
-        this.#terminal.write('\x05') // Ctrl+E (ASCII ENQ)
-        handled = true
-      } else if (
+        event.altKey &&
+        event.type === 'keydown' &&
         typeof onAltNavigation === 'function' &&
         onAltNavigation(event)
       ) {
         handled = true
+      } else if (
+        // Ctrl/Cmd + Backspace (delete entire line)
+        (event.ctrlKey || event.metaKey) &&
+        event.key === 'Backspace' &&
+        event.type === 'keydown'
+      ) {
+        if (typeof onClearLine === 'function' && onClearLine()) {
+          handled = true
+        } else {
+          // Fallback: Go to end of line (Ctrl+E), then kill to beginning (Ctrl+U)
+          this.#terminal.write('\x05\x15')
+          handled = true
+        }
+      } else if (
+        // Ctrl/Cmd + Left Arrow (beginning of line)
+        (event.ctrlKey || event.metaKey) &&
+        event.key === 'ArrowLeft' &&
+        event.type === 'keydown'
+      ) {
+        if (
+          typeof onJumpToLineEdge === 'function' &&
+          onJumpToLineEdge('start')
+        ) {
+          handled = true
+        } else {
+          this.#terminal.write('\x01') // Ctrl+A (ASCII SOH)
+          handled = true
+        }
+      } else if (
+        // Ctrl/Cmd + Right Arrow (end of line)
+        (event.ctrlKey || event.metaKey) &&
+        event.key === 'ArrowRight' &&
+        event.type === 'keydown'
+      ) {
+        if (typeof onJumpToLineEdge === 'function' && onJumpToLineEdge('end')) {
+          handled = true
+        } else {
+          this.#terminal.write('\x05') // Ctrl+E (ASCII ENQ)
+          handled = true
+        }
       } else if (
         event.type === 'keydown' &&
         event.key === 'c' &&
@@ -124,7 +224,6 @@ export class TerminalManager {
       return usesGhosttySemantics ? handled : !handled
     })
 
-    void this.#scheduleInitialFit()
     this.#initialized = true
     return this.#terminal
   }
@@ -151,26 +250,8 @@ export class TerminalManager {
 
   dispose() {
     if (!this.#initialized) return
-    this.#resizeObserver?.disconnect()
-    this.#resizeObserver = null
     this.#fitAddon.dispose()
     this.#terminal.dispose()
     this.#initialized = false
-  }
-
-  async #scheduleInitialFit() {
-    if (typeof document === 'undefined' || !('fonts' in document)) {
-      setTimeout(() => this.#fitAddon.fit(), 25)
-      return
-    }
-
-    try {
-      await document.fonts.ready
-      await document.fonts.load('17px Lilex')
-    } catch {
-      // Ignore font load errors
-    }
-
-    this.#fitAddon.fit()
   }
 }

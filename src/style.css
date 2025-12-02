@@ -16,6 +16,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Glass TTY VT220";
+  src: url("/fonts/Glass-TTY-VT220.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 ::selection {
   background-color: hsl(308, 96%, 81%);
   color: hsl(232, 30%, 21%);

@@ -12,6 +12,13 @@ export type CommandRunnerOptions = {
   streamingCommands?: Set<string>
 }
 
+type ExecRequestBody = {
+  command: string
+  sessionId: string
+  cols?: number
+  rows?: number
+}
+
 export type SandboxExecResult = {
   stdout?: string
   stderr?: string
@@ -38,11 +45,20 @@ export function createCommandRunner({
 }: CommandRunnerOptions) {
   if (!sessionId) throw new Error('Session ID is required')
 
+  function getExecBody(command: string): ExecRequestBody {
+    return {
+      command,
+      sessionId,
+      cols: terminal.cols,
+      rows: terminal.rows,
+    }
+  }
+
   async function runSimpleCommand(command: string) {
     const response = await fetch('/api/exec', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command, sessionId }),
+      body: JSON.stringify(getExecBody(command)),
     })
 
     const payload = await parseJsonResponse(response)
@@ -57,7 +73,7 @@ export function createCommandRunner({
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({ command, sessionId }),
+      body: JSON.stringify(getExecBody(command)),
     })
 
     const contentType = response.headers.get('content-type') ?? ''
