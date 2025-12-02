@@ -172,12 +172,53 @@ function insertCommandResultGap(html: string): string {
   const extractText = (content: string) =>
     content.replace(/<[^>]+>/g, '').replace(/\u00a0/g, ' ')
 
+  // Detect if two consecutive lines are wrapped (not a true line break)
+  // A wrapped line: current ends with non-whitespace, next starts with non-whitespace (not $)
+  function isWrappedContinuation(
+    currentText: string,
+    nextText: string,
+  ): boolean {
+    if (!currentText || !nextText) return false
+    const currentTrimmed = currentText.trimEnd()
+    const nextTrimmed = nextText.trimStart()
+    if (!currentTrimmed || !nextTrimmed) return false
+
+    // If next line starts with $, it's a new command, not a continuation
+    if (nextTrimmed.startsWith('$')) return false
+
+    // If current line ends with whitespace, it's not a wrapped mid-token
+    const lastChar = currentTrimmed.at(-1)
+    if (!lastChar || /\s/.test(lastChar)) return false
+
+    // If next line starts with whitespace, it's indented output, not a continuation
+    const firstChar = nextTrimmed.at(0)
+    if (!firstChar) return false
+
+    // Heuristic: if line ends mid-word (not ending with punctuation/operator)
+    // and next line continues without leading whitespace, it's wrapped
+    const endsCleanly = /[|&;>\s]$/.test(currentTrimmed)
+    if (endsCleanly) return false
+
+    return true
+  }
+
   let commandEndIndex = -1
   for (let index = 0; index < rows.length; index++) {
     const text = extractText(rows[index]![1]).trimEnd()
     if (!text) continue
     commandEndIndex = index
-    if (!text.endsWith('\\')) break
+
+    // Explicit line continuation with backslash
+    if (text.endsWith('\\')) continue
+
+    // Check if next row is a wrapped continuation of this line
+    const nextRow = rows[index + 1]
+    if (nextRow) {
+      const nextText = extractText(nextRow[1])
+      if (isWrappedContinuation(text, nextText)) continue
+    }
+
+    break
   }
 
   if (commandEndIndex === -1 || commandEndIndex === rows.length - 1) return html
@@ -316,7 +357,8 @@ function FreshCommandOutput(props: { command: string; autorun: boolean }) {
     terminal.open(hiddenContainer)
 
     try {
-      const sessionId = 'html-command-shared'
+      // Generate unique session per execution to avoid sharing sandbox state between visitors
+      const sessionId = `cmd-${crypto.randomUUID()}`
 
       const response = await fetch('/api/exec', {
         method: 'POST',
