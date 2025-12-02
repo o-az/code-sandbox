@@ -35,6 +35,7 @@
   "files": [
     "wasm.d.ts",
     "reset.d.ts",
+    "websocket.ts",
     "vite.config.ts",
     "worker-configuration.d.ts"
   ],

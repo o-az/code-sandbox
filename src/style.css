@@ -16,6 +16,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Glass TTY VT220";
+  src: url("/fonts/Glass-TTY-VT220.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 ::selection {
   background-color: hsl(308, 96%, 81%);
   color: hsl(232, 30%, 21%);
@@ -166,15 +174,6 @@ input[type="number"] {
   background-color: transparent !important;
 }
 
-.xterm {
-  padding: 8px;
-}
-
-.xterm-viewport,
-.xterm-scrollable-element {
-  background-color: #0d1117 !important;
-}
-
 pre.shiki {
   padding: 16px 16px 10px;
   overflow-x: auto;
@@ -200,4 +199,9 @@ pre.shiki code {
 
 pre.has-focused .line:not(.focused) {
   @apply blur-[2px];
+}
+
+[data-element="command-output"] pre span {
+  /* white-space: normal; */
+  white-space-collapse: loose;
 }

@@ -1,180 +1,229 @@
-import { Terminal } from '@xterm/xterm'
 import { Readline } from 'xterm-readline'
-import { FitAddon } from '@xterm/addon-fit'
-import { WebglAddon } from '@xterm/addon-webgl'
-import { ImageAddon } from '@xterm/addon-image'
-import { SearchAddon } from '@xterm/addon-search'
-import { WebLinksAddon } from '@xterm/addon-web-links'
-import { SerializeAddon } from '@xterm/addon-serialize'
-import { Unicode11Addon } from '@xterm/addon-unicode11'
-import { ClipboardAddon } from '@xterm/addon-clipboard'
-import { LigaturesAddon } from '@xterm/addon-ligatures'
+import { FitAddon, Terminal } from 'ghostty-web'
+
+import { TerminalSerializeAdapter } from '#lib/terminal/serialize.ts'
 
 export type TerminalInitOptions = {
   onAltNavigation?: (event: KeyboardEvent) => boolean
+  onClearLine?: () => boolean
+  onJumpToLineEdge?: (edge: 'start' | 'end') => boolean
 }
 
-function isMobileDevice(): boolean {
-  if (typeof window === 'undefined') return false
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent,
-  )
+const FONT_STORAGE_KEY = 'terminal-font'
+const DEFAULT_FONT = 'Lilex'
+const RETRO_FONT = 'Glass TTY VT220'
+
+const DEFAULT_THEME = {
+  background: '#0d1117',
+  foreground: '#f0f6fc',
+  cursor: '#58a6ff',
+  selectionBackground: '#58a6ff33',
+  black: '#0d1117',
+  red: '#ff7b72',
+  green: '#3fb950',
+  yellow: '#d29922',
+  blue: '#58a6ff',
+  magenta: '#bc8cff',
+  cyan: '#39c5cf',
+  white: '#f0f6fc',
+  brightBlack: '#6e7681',
+  brightRed: '#ffa198',
+  brightGreen: '#56d364',
+  brightYellow: '#e3b341',
+  brightBlue: '#79c0ff',
+  brightMagenta: '#d2a8ff',
+  brightCyan: '#56d4dd',
+  brightWhite: '#f0f6fc',
+}
+
+// Brighter, more saturated colors for retro CRT aesthetic
+const RETRO_THEME = {
+  background: '#0a0a0a',
+  foreground: '#33ff33',
+  cursor: '#33ff33',
+  selectionBackground: '#33ff3344',
+  black: '#0a0a0a',
+  red: '#ff5555',
+  green: '#33ff33',
+  yellow: '#ffff55',
+  blue: '#55ffff',
+  magenta: '#ff55ff',
+  cyan: '#55ffff',
+  white: '#ffffff',
+  brightBlack: '#555555',
+  brightRed: '#ff8888',
+  brightGreen: '#66ff66',
+  brightYellow: '#ffff88',
+  brightBlue: '#88ffff',
+  brightMagenta: '#ff88ff',
+  brightCyan: '#88ffff',
+  brightWhite: '#ffffff',
+}
+
+export function getStoredFontFamily(): string {
+  if (typeof localStorage === 'undefined') return DEFAULT_FONT
+  return localStorage.getItem(FONT_STORAGE_KEY) ?? DEFAULT_FONT
 }
 
 export class TerminalManager {
   #terminal: Terminal
   #fitAddon: FitAddon
-  #webglAddon: WebglAddon | null = null
-  #unicode11Addon: Unicode11Addon
-  #serializeAddon: SerializeAddon
-  #searchAddon: SearchAddon
-  #imageAddon: ImageAddon
-  #clipboardAddon: ClipboardAddon
-  #ligaturesAddon: LigaturesAddon
-  #webLinksAddon: WebLinksAddon
+  #serializeAddon: TerminalSerializeAdapter
   #xtermReadline: Readline
   #initialized = false
-  #isMobile = isMobileDevice()
-  #resizeObserver: ResizeObserver | null = null
+  #fontFamily: string
+  #isRetroFont: boolean
 
   constructor() {
+    this.#fontFamily = getStoredFontFamily()
+    this.#isRetroFont = this.#fontFamily === RETRO_FONT
+
     this.#terminal = new Terminal({
-      fontSize: 17,
-      lineHeight: 1.2,
-      scrollback: 5000,
+      fontSize: this.#isRetroFont ? 20 : 17,
+      scrollback: 5_000,
       convertEol: true,
       cursorBlink: true,
-      allowProposedApi: true,
-      scrollOnUserInput: false,
       cursorStyle: 'underline',
-      rightClickSelectsWord: true,
-      rescaleOverlappingGlyphs: true,
-      ignoreBracketedPasteMode: true,
-      cursorInactiveStyle: 'underline',
-      drawBoldTextInBrightColors: true,
-      fontFamily: 'Lilex, monospace',
-      theme: {
-        background: '#0d1117',
-        foreground: '#f0f6fc',
-        cursor: '#58a6ff',
-        selectionBackground: '#58a6ff33',
-        selectionInactiveBackground: '#58a6ff22',
-        black: '#484f58',
-        red: '#ff7b72',
-        green: '#3fb950',
-        yellow: '#d29922',
-        blue: '#58a6ff',
-        magenta: '#bc8cff',
-        cyan: '#39c5cf',
-        white: '#b1bac4',
-        brightBlack: '#6e7681',
-        brightRed: '#ffa198',
-        brightGreen: '#56d364',
-        brightYellow: '#e3b341',
-        brightBlue: '#79c0ff',
-        brightMagenta: '#d2a8ff',
-        brightCyan: '#56d4dd',
-        brightWhite: '#f0f6fc',
-      },
+      fontFamily: `"${this.#fontFamily}", monospace`,
+      theme: this.#isRetroFont ? RETRO_THEME : DEFAULT_THEME,
     })
+
+    const terminalOptions = this.#terminal.options as {
+      tabStopWidth?: number
+    }
+
+    if (typeof terminalOptions.tabStopWidth !== 'number') {
+      terminalOptions.tabStopWidth = 8
+    }
 
     this.#fitAddon = new FitAddon()
-    if (!this.#isMobile) this.#webglAddon = new WebglAddon()
-
-    this.#unicode11Addon = new Unicode11Addon()
-    this.#serializeAddon = new SerializeAddon()
-    this.#searchAddon = new SearchAddon({ highlightLimit: 50 })
-    this.#imageAddon = new ImageAddon({ showPlaceholder: true })
-    this.#clipboardAddon = new ClipboardAddon()
-    this.#ligaturesAddon = new LigaturesAddon()
-    this.#webLinksAddon = new WebLinksAddon((event, url) => {
-      event.preventDefault()
-      window.open(url, '_blank', 'noopener,noreferrer')
-    })
+    this.#serializeAddon = new TerminalSerializeAdapter(this.#terminal)
     this.#xtermReadline = new Readline()
 
-    this.#webglAddon?.onContextLoss(() => this.#webglAddon?.dispose())
     this.#terminal.onBell(() => console.info('bell'))
   }
 
   init(
     element: (HTMLDivElement & { xterm?: Terminal }) | null | undefined,
-    { onAltNavigation }: TerminalInitOptions = {},
+    {
+      onAltNavigation,
+      onClearLine,
+      onJumpToLineEdge,
+    }: TerminalInitOptions = {},
   ) {
     if (this.#initialized) return this.#terminal
     if (!element) throw new Error('Terminal element is required')
 
-    this.#terminal.open(element)
-    // @ts-expect-error
-    window.xterm = this.#terminal
-
-    // ResizeObserver for container size changes (more reliable than window resize)
-    this.#resizeObserver = new ResizeObserver(() => {
-      // Use requestAnimationFrame to debounce rapid resize events
-      requestAnimationFrame(() => this.#fitAddon.fit())
-    })
-    this.#resizeObserver.observe(element)
-
-    if (this.#webglAddon) {
-      try {
-        this.#terminal.loadAddon(this.#webglAddon)
-      } catch (error) {
-        console.warn(
-          'WebGL addon failed to load, falling back to canvas:',
-          error,
-        )
-      }
-    }
+    // Load addons BEFORE opening (per ghostty-web demo best practice)
     this.#terminal.loadAddon(this.#fitAddon)
-    this.#terminal.loadAddon(this.#searchAddon)
-    this.#terminal.loadAddon(this.#clipboardAddon)
-    this.#terminal.loadAddon(this.#unicode11Addon)
-    this.#terminal.unicode.activeVersion = '11'
-    this.#terminal.loadAddon(this.#serializeAddon)
-    this.#terminal.loadAddon(this.#ligaturesAddon)
-    this.#terminal.loadAddon(this.#webLinksAddon)
-    this.#terminal.loadAddon(this.#imageAddon)
     this.#terminal.loadAddon(this.#xtermReadline)
 
+    // Open terminal (WASM already initialized via waitForTerminalRuntime)
+    this.#terminal.open(element)
+
+    // Expose terminal for debugging in development
+    ;(window as Window & { xterm?: Terminal }).xterm = this.#terminal
+
+    // Use FitAddon's built-in observeResize() (per ghostty-web demo)
+    this.#fitAddon.fit()
+    this.#fitAddon.observeResize()
+
+    const usesGhosttySemantics =
+      typeof (this.#terminal as unknown as { ghostty?: unknown }).ghostty !==
+      'undefined'
+
     this.#terminal.attachCustomKeyEventHandler(event => {
-      // Ctrl + Left Arrow (beginning of line)
+      // Handle Cmd/Ctrl + R for refresh explicitly
       if (
-        event.ctrlKey &&
+        event.type === 'keydown' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'r'
+      ) {
+        window.location.reload()
+        return !!usesGhosttySemantics
+      }
+
+      // Allow other browser shortcuts to pass through
+      const key = event.key.toLowerCase()
+      const isBrowserShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        (key === 't' || // New tab
+          key === 'w' || // Close tab
+          key === 'n' || // New window
+          key === 'l' || // Focus address bar
+          key === 'f' || // Find
+          key === '+' || // Zoom in
+          key === '-' || // Zoom out
+          key === '0') // Reset zoom
+
+      if (isBrowserShortcut) {
+        // Let browser handle it - return false for ghostty, true for xterm
+        return !usesGhosttySemantics
+      }
+
+      let handled = false
+
+      // Alt key combinations - delegate to onAltNavigation first
+      if (
+        event.altKey &&
+        event.type === 'keydown' &&
+        typeof onAltNavigation === 'function' &&
+        onAltNavigation(event)
+      ) {
+        handled = true
+      } else if (
+        // Ctrl/Cmd + Backspace (delete entire line)
+        (event.ctrlKey || event.metaKey) &&
+        event.key === 'Backspace' &&
+        event.type === 'keydown'
+      ) {
+        if (typeof onClearLine === 'function' && onClearLine()) {
+          handled = true
+        } else {
+          // Fallback: Go to end of line (Ctrl+E), then kill to beginning (Ctrl+U)
+          this.#terminal.write('\x05\x15')
+          handled = true
+        }
+      } else if (
+        // Ctrl/Cmd + Left Arrow (beginning of line)
+        (event.ctrlKey || event.metaKey) &&
         event.key === 'ArrowLeft' &&
         event.type === 'keydown'
       ) {
-        this.#terminal.write('\x01') // Ctrl+A (ASCII SOH)
-        return false
-      }
-      // Ctrl + Right Arrow (end of line)
-      if (
-        event.ctrlKey &&
+        if (
+          typeof onJumpToLineEdge === 'function' &&
+          onJumpToLineEdge('start')
+        ) {
+          handled = true
+        } else {
+          this.#terminal.write('\x01') // Ctrl+A (ASCII SOH)
+          handled = true
+        }
+      } else if (
+        // Ctrl/Cmd + Right Arrow (end of line)
+        (event.ctrlKey || event.metaKey) &&
         event.key === 'ArrowRight' &&
         event.type === 'keydown'
       ) {
-        this.#terminal.write('\x05') // Ctrl+E (ASCII ENQ)
-        return false
-      }
-
-      // Alt navigation callback
-      if (typeof onAltNavigation === 'function' && onAltNavigation(event)) {
-        return false
-      }
-
-      // Ctrl+Meta+C handling
-      if (
+        if (typeof onJumpToLineEdge === 'function' && onJumpToLineEdge('end')) {
+          handled = true
+        } else {
+          this.#terminal.write('\x05') // Ctrl+E (ASCII ENQ)
+          handled = true
+        }
+      } else if (
         event.type === 'keydown' &&
         event.key === 'c' &&
         event.ctrlKey &&
         event.metaKey
       ) {
-        return false
+        // Ctrl+Meta+C handling
+        handled = true
       }
 
-      return true
+      return usesGhosttySemantics ? handled : !handled
     })
 
-    void this.#scheduleInitialFit()
     this.#initialized = true
     return this.#terminal
   }
@@ -201,34 +250,8 @@ export class TerminalManager {
 
   dispose() {
     if (!this.#initialized) return
-    this.#resizeObserver?.disconnect()
-    this.#resizeObserver = null
-    this.#webglAddon?.dispose()
     this.#fitAddon.dispose()
-    this.#searchAddon.dispose()
-    this.#clipboardAddon.dispose()
-    this.#unicode11Addon.dispose()
-    this.#serializeAddon.dispose()
-    this.#ligaturesAddon.dispose()
-    this.#webLinksAddon.dispose()
-    this.#imageAddon.dispose()
     this.#terminal.dispose()
     this.#initialized = false
-  }
-
-  async #scheduleInitialFit() {
-    if (typeof document === 'undefined' || !('fonts' in document)) {
-      setTimeout(() => this.#fitAddon.fit(), 25)
-      return
-    }
-
-    try {
-      await document.fonts.ready
-      await document.fonts.load('17px Lilex')
-    } catch {
-      // Ignore font load errors
-    }
-
-    this.#fitAddon.fit()
   }
 }

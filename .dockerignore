@@ -5,6 +5,7 @@
 !./src/**/*
 !./public/**/*
 !./scripts/**/*
+!./websocket.ts
 !./package.json
 !./wrangler.json
 !./Dockerfile

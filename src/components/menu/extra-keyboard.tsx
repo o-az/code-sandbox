@@ -3,17 +3,16 @@ import {
   Show,
   onMount,
   onCleanup,
-  createMemo,
   createEffect,
   createSignal,
 } from 'solid-js'
-import type { Terminal } from '@xterm/xterm'
+import type { Terminal } from 'ghostty-web'
 import type { JSX } from 'solid-js/h/jsx-runtime'
 import { useKeyDownEvent } from '@solid-primitives/keyboard'
 import { createActiveElement } from '@solid-primitives/active-element'
 import { createEventDispatcher } from '@solid-primitives/event-dispatcher'
 
-import { useEmbedDetector } from './embed-detector.tsx'
+import { useEmbedDetector } from '#components/embed-detector.tsx'
 
 /**
  * disabled and hidden in embed mode
@@ -59,16 +58,14 @@ type KeyboardButtonProps = {
 
 type TerminalWindow = Window & { xterm?: Terminal }
 
-type ExtraKeyboardProps = {
+export type ExtraKeyboardProps = {
+  visible?: boolean
   onVirtualKey?: (
     event: CustomEvent<{ key: string; modifiers: string[] }>,
   ) => void
 }
 
 export function ExtraKeyboard(props: ExtraKeyboardProps) {
-  const [isHidden, setIsHidden] = createSignal(true)
-  const [hasInteracted, setHasInteracted] = createSignal(false)
-
   const keydownEvent = useKeyDownEvent()
   const activeElement = createActiveElement()
   const dispatch = createEventDispatcher(props)
@@ -81,10 +78,7 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
   } = createLatchedModifiers()
   const { ready, terminal, textarea } = createTerminalBridge()
 
-  const toggleLabel = createMemo(() => {
-    if (!hasInteracted()) return 'Extra Keys'
-    return isHidden() ? 'Show' : 'Hide'
-  })
+  const isVisible = () => props.visible ?? false
 
   let synthesizing = false
 
@@ -106,11 +100,6 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
   onCleanup(() => {
     clearLatchedModifiers()
   })
-
-  const handleToggleClick = () => {
-    setHasInteracted(true)
-    setIsHidden(hidden => !hidden)
-  }
 
   const keyboardLabelFor = (value: ModifierKey) =>
     MODIFIER_META[value]?.short ?? value.toLowerCase()
@@ -247,22 +236,19 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
   const isEmbedded = useEmbedDetector()
 
   return (
-    <Show when={ready() && !isEmbedded()}>
+    <Show when={ready() && !isEmbedded() && isVisible()}>
       <div
-        data-hidden={isHidden() ? 'true' : 'false'}
+        data-visible={isVisible() ? 'true' : 'false'}
         data-element="extra-keyboard"
         style={{ bottom: KEYBOARD_OFFSET }}
-        class="fixed inset-x-0 z-1000 flex flex-col items-center gap-2 transition-[opacity,transform] duration-300 ease-out"
-        classList={{
-          'pointer-events-none translate-y-full opacity-0': isHidden(),
-        }}>
+        class="fixed inset-x-0 z-1000 flex flex-col items-center gap-2 pb-2 transition-[opacity,transform] duration-300 ease-out">
         <div class="flex flex-wrap justify-center gap-1.5">
           <For each={SPECIAL_KEYS}>
             {item => (
               <button
                 type="button"
                 onClick={() => handleSpecialKey(item.value)}
-                class="flex h-6 min-w-10 items-center justify-center rounded-xs bg-[#1f2933] px-3 text-[11px] font-semibold tracking-wide text-white transition duration-150 hover:bg-[#2b3642] active:scale-95 active:bg-[#11151a]">
+                class="flex h-7 min-w-11 items-center justify-center rounded bg-[#1f2933] px-3 text-[11px] font-semibold tracking-wide text-white transition duration-150 hover:bg-[#2b3642] active:scale-95 active:bg-[#11151a]">
                 {item.label}
               </button>
             )}
@@ -281,15 +267,6 @@ export function ExtraKeyboard(props: ExtraKeyboardProps) {
           </For>
         </div>
       </div>
-      <button
-        type="button"
-        id="extra-keys-toggler"
-        class="fixed right-0 z-1001 rounded-sm border rounded-r-none border-r-0 p-2 mb-2 border-white/15 bg-[#0c0f15]/90 text-xs uppercase tracking-wide text-white transition hover:text-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#58a6ff]"
-        style={{ bottom: KEYBOARD_OFFSET }}
-        data-element="extra-keys-toggler"
-        onClick={handleToggleClick}>
-        {toggleLabel()}
-      </button>
     </Show>
   )
 }

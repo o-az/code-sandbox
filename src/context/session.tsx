@@ -82,9 +82,7 @@ const [SessionProvider, useSessionContext] = createContextProvider<
     return nextState
   }
 
-  function markRefreshIntent() {
-    setRefreshIntent(true)
-  }
+  const markRefreshIntent = () => setRefreshIntent(true)
 
   function consumeRefreshIntent() {
     const hadIntent = refreshIntent() === true
@@ -93,16 +91,16 @@ const [SessionProvider, useSessionContext] = createContextProvider<
   }
 
   function clearStoredSessionState() {
-    setSessionId(null)
     setTabId(null)
+    setSessionId(null)
     setSessionActive(null)
     setRefreshIntent(null)
     setSessionState(undefined)
   }
 
   return {
-    ensureClientSession,
     markRefreshIntent,
+    ensureClientSession,
     consumeRefreshIntent,
     clearStoredSessionState,
   }

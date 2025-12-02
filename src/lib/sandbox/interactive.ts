@@ -1,14 +1,14 @@
-import type { Terminal } from '@xterm/xterm'
-import type { SerializeAddon } from '@xterm/addon-serialize'
+import type { Terminal } from 'ghostty-web'
 
 import type { StatusMode } from '#components/status.tsx'
+import type { TerminalSerializeAdapter } from '#lib/terminal/serialize.ts'
 
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
 
 export type InteractiveSessionOptions = {
   terminal: Terminal
-  serializeAddon: SerializeAddon
+  serializer: TerminalSerializeAdapter
   sessionId: string
   setStatus: (mode: StatusMode) => void
   onSessionExit?: (mode: StatusMode) => void
@@ -25,7 +25,7 @@ export type InteractiveSessionAPI = {
 
 export function createInteractiveSession({
   terminal,
-  serializeAddon,
+  serializer,
   sessionId,
   setStatus,
   onSessionExit,
@@ -39,7 +39,7 @@ export function createInteractiveSession({
   let interactiveInitQueued = ''
   let interactiveResolve: (() => void) | undefined
   let interactiveReject: ((reason?: unknown) => void) | undefined
-  let dataListener: import('@xterm/xterm').IDisposable | undefined
+  let dataListener: import('ghostty-web').IDisposable | undefined
 
   function startInteractiveSession(command: string) {
     if (interactiveMode) {
@@ -49,6 +49,13 @@ export function createInteractiveSession({
       setStatus('interactive')
       return Promise.resolve()
     }
+
+    // Reject any pending promise before starting a new session
+    interactiveReject?.(
+      new Error('Session replaced by new interactive session'),
+    )
+    interactiveResolve = undefined
+    interactiveReject = undefined
 
     interactiveMode = true
     interactiveInitQueued = command.endsWith('\n') ? command : `${command}\n`
@@ -99,20 +106,30 @@ export function createInteractiveSession({
     const { data } = event
     if (typeof data === 'string') {
       try {
-        const payload: any = JSON.parse(data)
-        if (payload?.type === 'pong' || payload?.type === 'ready') return
-        if (payload?.type === 'process-exit') {
-          const exitCode =
-            typeof payload.exitCode === 'number' ? payload.exitCode : 'unknown'
-          terminal.writeln(
-            `\r\n[interactive session exited with code ${exitCode}]`,
-          )
-          resetInteractiveState('online')
-          return
+        const payload: unknown = JSON.parse(data)
+        if (
+          typeof payload === 'object' &&
+          payload !== null &&
+          'type' in payload
+        ) {
+          const messageType = (payload as { type: unknown }).type
+          if (messageType === 'pong' || messageType === 'ready') return
+          if (messageType === 'process-exit') {
+            const exitCode =
+              'exitCode' in payload &&
+              typeof (payload as { exitCode: unknown }).exitCode === 'number'
+                ? (payload as { exitCode: number }).exitCode
+                : 'unknown'
+            terminal.writeln(
+              `\r\n[interactive session exited with code ${exitCode}]`,
+            )
+            resetInteractiveState('online')
+            return
+          }
         }
       } catch {
         terminal.write(data, () => {
-          if (logLevel === 'debug') console.info(serializeAddon.serialize())
+          if (logLevel === 'debug') console.info(serializer.serialize())
         })
       }
       return
@@ -122,7 +139,7 @@ export function createInteractiveSession({
       const text = textDecoder.decode(new Uint8Array(data))
       if (text) {
         terminal.write(text, () => {
-          if (logLevel === 'debug') console.info(serializeAddon.serialize())
+          if (logLevel === 'debug') console.info(serializer.serialize())
         })
       }
       return
@@ -132,7 +149,7 @@ export function createInteractiveSession({
       const text = textDecoder.decode(data)
       if (text) {
         terminal.write(text, () => {
-          if (logLevel === 'debug') console.info(serializeAddon.serialize())
+          if (logLevel === 'debug') console.info(serializer.serialize())
         })
       }
     }
@@ -163,9 +180,22 @@ export function createInteractiveSession({
   function sendInteractiveInput(text: string) {
     if (!text) return
     if (!interactiveSocket || interactiveSocket.readyState !== WebSocket.OPEN) {
+      if (logLevel === 'debug') {
+        console.warn(
+          'WebSocket not open, input discarded:',
+          text.length,
+          'chars',
+        )
+      }
       return
     }
-    interactiveSocket.send(textEncoder.encode(text))
+    try {
+      interactiveSocket.send(textEncoder.encode(text))
+    } catch (error) {
+      if (logLevel === 'debug') {
+        console.error('Failed to send input:', error)
+      }
+    }
   }
 
   function sendInteractiveJson(payload: unknown) {

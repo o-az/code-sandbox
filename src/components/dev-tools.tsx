@@ -1,10 +1,13 @@
 import { onMount } from 'solid-js'
 
+import { useEmbedDetector } from '#components/embed-detector.tsx'
+
 export function useDevTools() {
   if (!import.meta.env.DEV) return null
 
+  const embed = useEmbedDetector()
   onMount(() => {
-    if (import.meta.env.DEV)
+    if (import.meta.env.DEV && !embed())
       void import('eruda').then(({ default: eruda }) => {
         eruda.init()
       })

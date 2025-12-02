@@ -284,9 +284,116 @@ export function createVirtualKeyboardBridge({
     return false
   }
 
+  function handleClearLine(): boolean {
+    if (isInteractiveMode()) {
+      // For interactive mode, send Ctrl+E (end of line) + Ctrl+U (kill to beginning)
+      sendInteractiveInput('\x05\x15')
+      return true
+    }
+
+    // For readline mode, clear the buffer directly
+    const internal = xtermReadline as unknown as {
+      readData?: (data: string) => void
+      state?: {
+        line?: {
+          buffer?: () => string
+          pos?: number
+        }
+      }
+    }
+
+    const buffer =
+      typeof internal.state?.line?.buffer === 'function'
+        ? internal.state.line.buffer()
+        : ''
+    const pos = internal.state?.line?.pos ?? buffer.length
+
+    if (buffer.length === 0) return true
+
+    // Send DEL characters to delete everything
+    // First delete from cursor to end, then from beginning to where cursor was
+    const charsAfterCursor = buffer.length - pos
+    const charsBeforeCursor = pos
+
+    if (typeof internal.readData === 'function') {
+      // Move to end and delete backward
+      // Send right arrows to go to end
+      for (let i = 0; i < charsAfterCursor; i++) {
+        internal.readData('\x1b[C') // Right arrow
+      }
+      // Delete all characters
+      for (let i = 0; i < buffer.length; i++) {
+        internal.readData('\x7f') // DEL
+      }
+    }
+    return true
+  }
+
+  function handleJumpToLineEdge(edge: 'start' | 'end'): boolean {
+    if (isInteractiveMode()) {
+      // For interactive mode, send Ctrl+A (start) or Ctrl+E (end)
+      sendInteractiveInput(edge === 'start' ? '\x01' : '\x05')
+      return true
+    }
+
+    // For readline mode, manipulate cursor position directly
+    const internal = xtermReadline as unknown as {
+      state?: {
+        moveCursor?: () => void
+        line?: {
+          buffer?: () => string
+          set_pos?: (value: number) => void
+          pos?: number
+        }
+      }
+    }
+
+    const line = internal.state?.line
+    const buffer = typeof line?.buffer === 'function' ? line.buffer() : ''
+
+    if (
+      !line ||
+      typeof line.set_pos !== 'function' ||
+      typeof internal.state?.moveCursor !== 'function'
+    ) {
+      return false
+    }
+
+    const targetPos = edge === 'start' ? 0 : buffer.length
+    line.set_pos(targetPos)
+    internal.state.moveCursor?.()
+    return true
+  }
+
+  /**
+   * Refresh readline display after terminal resize to fix cursor position.
+   * This should be called after fitAddon.fit() completes.
+   */
+  function handleResize(): void {
+    if (isInteractiveMode()) {
+      // Interactive mode handles its own resize via PTY
+      return
+    }
+
+    // Access readline's internal state to refresh the display
+    const internal = xtermReadline as unknown as {
+      state?: {
+        refresh?: () => void
+      }
+    }
+
+    // Call refresh to redraw the line with correct layout
+    if (typeof internal.state?.refresh === 'function') {
+      internal.state.refresh()
+    }
+  }
+
   return {
     sendVirtualKeyboardInput,
     handleAltNavigation,
+    handleClearLine,
+    handleJumpToLineEdge,
+    handleResize,
   }
 }
 
@@ -314,13 +421,16 @@ function controlCharacterForKey(rawKey: string) {
 }
 
 function handleReadlineAltKey(key: string, readline: Readline) {
-  if (key !== 'ArrowLeft' && key !== 'ArrowRight') return false
+  if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Backspace')
+    return false
+
   const internal = readline as unknown as {
     state?: {
       moveCursor?: () => void
       line?: {
         buffer?: () => string
         set_pos?: (value: number) => void
+        set_buffer?: (value: string) => void
         pos?: number
       }
     }
@@ -340,6 +450,7 @@ function handleReadlineAltKey(key: string, readline: Readline) {
       : typeof buffer.length === 'number'
         ? buffer.length
         : 0
+
   if (key === 'ArrowLeft') {
     const target = findWordBoundaryLeft(buffer, current)
     if (target === current) return true
@@ -347,6 +458,7 @@ function handleReadlineAltKey(key: string, readline: Readline) {
     internal.state.moveCursor?.()
     return true
   }
+
   if (key === 'ArrowRight') {
     const target = findWordBoundaryRight(buffer, current)
     if (target === current) return true
@@ -354,6 +466,26 @@ function handleReadlineAltKey(key: string, readline: Readline) {
     internal.state.moveCursor?.()
     return true
   }
+
+  if (key === 'Backspace') {
+    const target = findWordBoundaryLeft(buffer, current)
+    if (target === current) return true
+
+    // Send individual backspace characters to delete the word
+    // This uses readline's built-in backspace handling for proper display update
+    const charsToDelete = current - target
+    const internalReadline = readline as unknown as {
+      readData?: (data: string) => void
+    }
+    if (typeof internalReadline.readData === 'function') {
+      // DEL character (0x7f) is what readline uses for backspace
+      for (let i = 0; i < charsToDelete; i++) {
+        internalReadline.readData('\x7f')
+      }
+    }
+    return true
+  }
+
   return false
 }
 

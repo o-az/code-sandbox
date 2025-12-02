@@ -11,6 +11,8 @@ const DEFAULT_TIMEOUT_MS = 25_000
 const ExecCommandRequestSchema = z.object({
   command: z.string(),
   sessionId: z.string({ error: 'Missing sessionId' }),
+  cols: z.optional(z.number()),
+  rows: z.optional(z.number()),
 })
 
 export const Route = createFileRoute('/api/exec')({
@@ -23,14 +25,27 @@ export const Route = createFileRoute('/api/exec')({
         if (!payload.success)
           return json({ error: payload.error.message }, { status: 400 })
 
-        const { command, sessionId } = payload.data
+        const { command, sessionId, cols, rows } = payload.data
 
         const sandboxId = ensureSandboxSession(sessionId).sandboxId
         const sandbox = getSandbox(env.Sandbox, sandboxId)
 
+        const execEnv: Record<string, string> = {
+          CLICOLOR: '1',
+          FORCE_COLOR: '3',
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: '1',
+        }
+
+        // Pass terminal dimensions so commands format output correctly
+        if (cols) execEnv.COLUMNS = String(cols)
+        if (rows) execEnv.LINES = String(rows)
+
         try {
           const result = await sandbox.exec(command, {
             timeout: DEFAULT_TIMEOUT_MS,
+            env: execEnv,
           })
           return json({ ...result, sandboxId }, { status: 200 })
         } catch (error) {
@@ -41,6 +56,7 @@ export const Route = createFileRoute('/api/exec')({
             await new Promise(resolve => setTimeout(resolve, 100))
             const result = await sandbox.exec(command, {
               timeout: DEFAULT_TIMEOUT_MS,
+              env: execEnv,
             })
             return json({ ...result, sandboxId }, { status: 200 })
           }

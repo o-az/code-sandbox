@@ -16,7 +16,12 @@ export default defineConfig(config => {
 
   const plugins = [
     VitePluginDevtoolsJson(),
-    VitePluginTanstackDevtools({ removeDevtoolsOnBuild: true }),
+    VitePluginTanstackDevtools({
+      removeDevtoolsOnBuild: true,
+      eventBusConfig: {
+        port: randomIntInclusive(3_111, 8_111),
+      },
+    }),
     VitePluginInfo({
       cloudflare: true,
       github: 'https://github.com/o-az/sandbox',
@@ -44,6 +49,7 @@ export default defineConfig(config => {
     plugins,
     server: {
       port: Number(env.PORT || randomIntInclusive(3_100, 8_100)),
+      allowedHosts: config.mode === 'development' ? true : undefined,
     },
     oxc: {
       target: ['esnext'],

@@ -2,7 +2,6 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "typescript.preferences.importModuleSpecifierEnding": "js",
-  "typescript.experimental.useTsgo": true,
   "biome.enabled": true,
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -47,7 +46,6 @@
   },
 
   "search.exclude": {
-    ".git/**": true,
     "**/dist/**": true,
     "**/_/**": true,
     "**/bun.lock": true,

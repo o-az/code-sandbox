@@ -1,14 +1,10 @@
 #!/usr/bin/env node
 
-import { App } from 'uWebSockets.js'
+import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
-import crossws from 'crossws/adapters/uws'
+import crossws from 'crossws/adapters/node'
 import { spawn, type IPty } from 'node-pty'
-
-/**
- * WebSocket-based PTY bridge using node-pty + crossws + uWebSockets.js
- * Used for interactive commands (REPLs, chisel, node, etc.)
- */
+import type { AdapterInternal, Peer } from 'crossws'
 
 const [DEFAULT_COLS, DEFAULT_ROWS] = [120, 32]
 const DEFAULT_SHELL = '/bin/bash --norc --noprofile'
@@ -22,10 +18,9 @@ type PtySession = {
   pty: IPty
   cols: number
   rows: number
-  // Output buffering state
   outputBuffer: string
-  flushTimer: ReturnType<typeof setTimeout> | null
   userInputPending: boolean
+  flushTimer: ReturnType<typeof setTimeout> | null
 }
 
 type SessionState =
@@ -37,31 +32,24 @@ type ControlMessage =
   | { type: 'resize'; cols: number; rows: number }
   | { type: 'ping'; id?: string }
 
-type Peer = {
-  send: (data: string | ArrayBuffer) => void
-  close: (code?: number, reason?: string) => void
-  readyState: number
-}
-
-const sessions = new WeakMap<Peer, SessionState>()
+const sessions = new WeakMap<Peer<AdapterInternal>, SessionState>()
 
 const ws = crossws({
   hooks: {
-    open(peer) {
+    open: peer => {
       const sessionId = randomUUID().slice(0, 8)
       sessions.set(peer, { status: 'idle', sessionId })
+
       peer.send(JSON.stringify({ type: 'ready' }))
       console.info('[pty] connection opened', { sessionId })
     },
 
-    message(peer, message) {
+    message: (peer, message) => {
       const state = sessions.get(peer)
       if (!state) return
-
       const data = message.text()
-
-      // Try parsing as control message first
       const payload = parseControlMessage(data)
+
       if (payload) {
         if (payload.type === 'ping') {
           peer.send(JSON.stringify({ type: 'pong', id: payload.id }))
@@ -83,12 +71,13 @@ const ws = crossws({
           return
         }
 
-        if (payload.type === 'resize') {
-          if (state.status !== 'ready') return
-          resizePty(state.session, payload.cols, payload.rows)
-          return
-        }
-
+        if (payload.type !== 'resize') return
+        if (state.status !== 'ready') return
+        resizePty({
+          session: state.session,
+          cols: payload.cols,
+          rows: payload.rows,
+        })
         return
       }
 
@@ -98,12 +87,11 @@ const ws = crossws({
         return
       }
 
-      // Mark user input pending for immediate response flushing
       state.session.userInputPending = true
       state.session.pty.write(data)
     },
 
-    close(peer, details) {
+    close: (peer, event) => {
       const state = sessions.get(peer)
       if (state?.status === 'ready') {
         if (state.session.flushTimer) clearTimeout(state.session.flushTimer)
@@ -111,13 +99,13 @@ const ws = crossws({
       }
       console.info('[pty] connection closed', {
         sessionId: state?.sessionId,
-        code: details.code,
-        reason: details.reason,
+        code: event.code,
+        reason: event.reason || undefined,
       })
       sessions.delete(peer)
     },
 
-    error(peer, error) {
+    error: (peer, error) => {
       console.error('[pty] connection error', error)
       const state = sessions.get(peer)
       if (state?.status === 'ready') {
@@ -126,8 +114,32 @@ const ws = crossws({
       }
       sessions.delete(peer)
     },
+
+    upgrade: request => {
+      console.info('[pty] upgrade', request.url)
+      return { headers: {} }
+    },
   },
 })
+
+const port = Number(process.env.WS_PORT || 80_80)
+
+const server = createServer((_request, response) => {
+  response.writeHead(200, { 'Content-Type': 'text/plain' })
+  response.end('PTY Server')
+})
+  .on('upgrade', ws.handleUpgrade)
+  .listen(port, '0.0.0.0', () => {
+    console.log(`[pty] 👂 ws://0.0.0.0:${port}`)
+  })
+
+const shutdown = () => {
+  ;[console.log('[pty] shutting down...'), server.close(), process.exit(0)]
+}
+
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
+process.on('SIGQUIT', shutdown)
 
 function spawnPty(
   peer: Peer,
@@ -148,7 +160,6 @@ function spawnPty(
       ? options.shell.trim()
       : DEFAULT_SHELL
 
-  // Parse shell command - could be "bash" or "bash --noprofile --norc -i"
   const shellParts = shell.split(/\s+/)
   const shellPath = shellParts[0]
   const shellArgs = shellParts.slice(1)
@@ -171,10 +182,8 @@ function spawnPty(
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       FORCE_COLOR: '1',
-      // PS1 escape codes wrapped in \[...\] for bash readline cursor calculation
-      // Using \e for escape (bash interprets this)
+      CLICOLOR: '1',
       PS1: '\\[\\033[32m\\]$ \\[\\033[0m\\]',
-      // Color customization for CLI tools (note: doesn't force colors, just customizes them)
       JQ_COLORS: '1;30:0;37:0;37:0;37:0;32:1;37:1;37',
       GCC_COLORS:
         'error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01',
@@ -191,10 +200,9 @@ function spawnPty(
     userInputPending: false,
   }
 
-  // Flush buffered output to WebSocket
   function flushOutput() {
     if (session.outputBuffer.length === 0) return
-    if (peer.readyState === 1) peer.send(session.outputBuffer)
+    if (peer.websocket.readyState === 1) peer.send(session.outputBuffer)
 
     session.outputBuffer = ''
     if (session.flushTimer) {
@@ -203,13 +211,9 @@ function spawnPty(
     }
   }
 
-  // Buffered output handler (from xterm.js demo best practices)
-  // Flushes immediately on user input or when buffer exceeds max size
-  // Otherwise batches output for better performance
   pty.onData((data: string) => {
     session.outputBuffer += data
 
-    // Flush immediately if user just typed or buffer is large
     if (
       session.userInputPending ||
       session.outputBuffer.length > BUFFER_MAX_SIZE
@@ -219,18 +223,15 @@ function spawnPty(
       return
     }
 
-    // Schedule flush if not already scheduled
     if (!session.flushTimer) {
       session.flushTimer = setTimeout(flushOutput, BUFFER_TIMEOUT_MS)
     }
   })
 
-  // Handle PTY exit
   pty.onExit(({ exitCode, signal }) => {
     console.info('[pty] process exited', { sessionId, exitCode, signal })
-    // Flush any remaining output before closing
     flushOutput()
-    if (peer.readyState === 1) {
+    if (peer.websocket.readyState === 1) {
       peer.send(JSON.stringify({ type: 'process-exit', exitCode, signal }))
       peer.close(1000, 'process exited')
     }
@@ -239,11 +240,15 @@ function spawnPty(
   return session
 }
 
-function resizePty(session: PtySession, cols: number, rows: number): void {
+function resizePty(params: {
+  session: PtySession
+  cols: number
+  rows: number
+}): void {
+  const { session, cols, rows } = params
   if (cols <= 0 || rows <= 0) return
   session.cols = cols
   session.rows = rows
-  // node-pty's resize() sends SIGWINCH - no echo, no artifacts
   session.pty.resize(cols, rows)
 }
 
@@ -255,37 +260,7 @@ function parseControlMessage(raw: string): ControlMessage | undefined {
     if (payload.type === 'resize') return payload
     if (payload.type === 'ping') return payload
   } catch {
-    // Not a JSON control message - likely terminal input
+    // Not JSON - terminal input
   }
   return undefined
 }
-
-const port = Number(process.env.WS_PORT || 80_80)
-
-const server = App()
-  .ws('/*', ws.websocket)
-  .get('/*', response => {
-    response.writeStatus('200 OK')
-    response.writeHeader('Content-Type', 'text/plain')
-    response.end(
-      'Cloudflare Sandbox WebSocket PTY server (node-pty + uWebSockets.js)',
-    )
-  })
-
-server.listen(port, listenSocket => {
-  if (listenSocket) {
-    console.log(`[pty] WebSocket PTY server listening on ws://0.0.0.0:${port}`)
-  } else {
-    console.error(`[pty] Failed to listen on port ${port}`)
-    process.exit(1)
-  }
-})
-
-const shutdown = () => {
-  console.log('[pty] shutting down...')
-  process.exit(0)
-}
-
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
-process.on('SIGQUIT', shutdown)

@@ -82,22 +82,22 @@ export function useTerminalSession({
   let isRefreshing = false
   let refreshShortcutPending = false
   let refreshShortcutTimer: number | undefined
+  let inputLoopReady = false
+  let pendingEmbedExecute = false
 
   // Initialize terminal
   let altNavigationDelegate: ((event: KeyboardEvent) => boolean) | undefined
+  let clearLineDelegate: (() => boolean) | undefined
+  let jumpToLineEdgeDelegate: ((edge: 'start' | 'end') => boolean) | undefined
   const terminal = terminalManager.init(terminalElement, {
     onAltNavigation: event => altNavigationDelegate?.(event) ?? false,
+    onClearLine: () => clearLineDelegate?.() ?? false,
+    onJumpToLineEdge: edge => jumpToLineEdgeDelegate?.(edge) ?? false,
   })
 
   const fitAddon = terminalManager.fitAddon
   const xtermReadline = terminalManager.readline
-  const serializeAddon = terminalManager.serializeAddon
-
-  const readlineApi = xtermReadline as unknown as {
-    read: (prompt: string) => Promise<string>
-    println: (line: string) => void
-    setCtrlCHandler: (handler: () => void) => void
-  }
+  const serializer = terminalManager.serializeAddon
 
   // Command runner
   const { runCommand } = createCommandRunner({
@@ -120,7 +120,7 @@ export function useTerminalSession({
     isInteractiveMode,
   } = createInteractiveSession({
     terminal,
-    serializeAddon,
+    serializer,
     sessionId: session.sessionId,
     setStatus: mode => {
       if (mode === 'interactive') return // handled by state machine
@@ -141,6 +141,8 @@ export function useTerminalSession({
     isInteractiveMode: () => state.isInteractiveMode(),
   })
   altNavigationDelegate = virtualKeyboardBridge.handleAltNavigation
+  clearLineDelegate = virtualKeyboardBridge.handleClearLine
+  jumpToLineEdgeDelegate = virtualKeyboardBridge.handleJumpToLineEdge
 
   // Keyboard insets
   cleanupInsets = initKeyboardInsets()
@@ -185,6 +187,8 @@ export function useTerminalSession({
   // This fires whenever terminal dimensions actually change, more reliable than window resize
   terminal.onResize(({ cols, rows }) => {
     notifyResize({ cols, rows })
+    // Refresh readline display after resize to maintain cursor position
+    virtualKeyboardBridge.handleResize()
   })
 
   // Window resize triggers fit(), which may trigger term.onResize if dimensions change
@@ -202,9 +206,9 @@ export function useTerminalSession({
   })
 
   // Ctrl+C handler
-  readlineApi.setCtrlCHandler(() => {
+  xtermReadline.setCtrlCHandler(() => {
     if (state.isInteractiveMode() || state.isCommandInProgress()) return
-    readlineApi.println('^C')
+    xtermReadline.println('^C')
     state.actions.setIdle()
     startInputLoop()
   })
@@ -288,7 +292,7 @@ export function useTerminalSession({
     awaitingInput = true
     state.actions.setAwaitingInput()
 
-    readlineApi
+    xtermReadline
       .read(prompt)
       .then(async rawCommand => {
         awaitingInput = false
@@ -298,8 +302,10 @@ export function useTerminalSession({
       .catch(error => {
         awaitingInput = false
         if (state.isInteractiveMode()) return
-        console.error('xtermReadline error', error)
-        state.actions.setError('Input error')
+        const errorMessage =
+          error instanceof Error ? error.message : String(error)
+        console.error('xtermReadline error:', errorMessage, error)
+        state.actions.setError(`Input error: ${errorMessage}`)
         startInputLoop()
       })
 
@@ -307,7 +313,12 @@ export function useTerminalSession({
   }
 
   function handlePrefilledCommand() {
-    if (hasPrefilledCommand || !session.prefilledCommand) return
+    if (hasPrefilledCommand || !session.prefilledCommand) {
+      // No prefilled command, mark ready immediately
+      inputLoopReady = true
+      processPendingEmbedExecute()
+      return
+    }
     hasPrefilledCommand = true
 
     setTimeout(() => {
@@ -322,6 +333,10 @@ export function useTerminalSession({
         terminal.options.disableStdin = true
       }
 
+      // Mark ready after prefilled command is pasted
+      inputLoopReady = true
+      processPendingEmbedExecute()
+
       if (session.autoRun) {
         setTimeout(() => {
           dispatchEnterKey()
@@ -332,6 +347,13 @@ export function useTerminalSession({
 
   function executeEmbedCommand() {
     if (!session.embedMode) return
+
+    // If the input loop isn't ready yet, queue the execution for later
+    if (!inputLoopReady) {
+      pendingEmbedExecute = true
+      return
+    }
+
     terminal.options.disableStdin = false
     dispatchEnterKey()
     setTimeout(() => {
@@ -339,11 +361,28 @@ export function useTerminalSession({
     }, 200)
   }
 
+  function processPendingEmbedExecute() {
+    if (!pendingEmbedExecute) return
+    pendingEmbedExecute = false
+    // Small delay to ensure everything is settled
+    setTimeout(() => executeEmbedCommand(), 50)
+  }
+
   function dispatchEnterKey() {
+    try {
+      if (typeof terminal.input === 'function') {
+        terminal.input('\r', true)
+        return
+      }
+    } catch (error) {
+      console.debug('terminal.input failed', error)
+    }
+
     const enterEvent = new KeyboardEvent('keydown', {
       key: 'Enter',
       code: 'Enter',
       bubbles: true,
+      cancelable: true,
     })
     terminal.textarea?.dispatchEvent(enterEvent)
   }
@@ -466,12 +505,19 @@ export function useTerminalSession({
 
   // Wait for initial warmup to complete before accepting commands
   // This prevents race conditions where commands and warmup both try to create the session
-  void warmupController.ready.then(() => {
-    // Re-fit and scroll after warmup content is written to ensure viewport is correct
-    fitAddon.fit()
-    terminal.scrollToBottom()
-    startInputLoop()
-  })
+  warmupController.ready
+    .then(() => {
+      // Re-fit and scroll after warmup content is written to ensure viewport is correct
+      fitAddon.fit()
+      terminal.scrollToBottom()
+      startInputLoop()
+    })
+    .catch(error => {
+      console.error('Warmup failed:', error)
+      state.actions.setError('Warmup failed')
+      // Still start the input loop so user can interact
+      startInputLoop()
+    })
 
   return {
     virtualKeyboardBridge,
